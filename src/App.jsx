@@ -1,7 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore';
-import { BarChart2, FileText, Settings, ShieldAlert, UploadCloud, Trash2, CheckCircle2, Trophy, Globe, Users } from 'lucide-react';
+import {
+  BarChart2,
+  FileText,
+  Settings,
+  ShieldAlert,
+  UploadCloud,
+  Trash2,
+  CheckCircle2,
+  Trophy,
+  Globe,
+  Users,
+  ChevronDown,
+  ChevronRight
+} from 'lucide-react';
 
 // CONFIGURACIÓN DE FIREBASE CONECTADA
 const firebaseConfig = {
@@ -715,6 +728,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('estadisticas');
   const [syncing, setSyncing] = useState(false);
 
+  // Estados para filas desplegables en Tabla 1 (Ranking FIFA) y Tabla 2 (Confederaciones)
+  const [expandedRankings, setExpandedRankings] = useState({});
+  const [expandedConfeds, setExpandedConfeds] = useState({});
+
   // Estado para la protección de PIN
   const [isAdmin, setIsAdmin] = useState(false);
   const [pinInput, setPinInput] = useState('');
@@ -771,28 +788,10 @@ export default function App() {
     };
   };
 
-  const global = calcMetricas(partidos);
-  const top10 = calcMetricas(partidos.filter(p => parseInt(p.ranking) <= 10));
-  const top11a20 = calcMetricas(partidos.filter(p => parseInt(p.ranking) > 10 && parseInt(p.ranking) <= 20));
-  const top20 = calcMetricas(partidos.filter(p => parseInt(p.ranking) <= 20));
-  const fueraTop20 = calcMetricas(partidos.filter(p => parseInt(p.ranking) > 20));
-
-  // Rendimiento por Confederación
-  const confederacionesStats = useMemo(() => {
-    const confs = ['Conmebol', 'Concacaf', 'AFC', 'OFC', 'UEFA', 'CAF'];
-    return confs
-      .map(c => ({
-        nombre: c,
-        ...calcMetricas(partidos.filter(p => (p.confederacion || '').toLowerCase() === c.toLowerCase()))
-      }))
-      .filter(c => c.total > 0)
-      .sort((a, b) => b.total - a.total || b.puntos - a.puntos);
-  }, [partidos]);
-
-  // Rendimiento por Rival (Mayor a menor cantidad de partidos)
-  const rivalesStats = useMemo(() => {
+  // Agrupar un subconjunto de partidos por rival (ordenado de mayor a menor partidos y puntos)
+  const agruparPorRival = (datos) => {
     const grupos = {};
-    const ordenadosFecha = [...partidos].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+    const ordenadosFecha = [...datos].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
     ordenadosFecha.forEach(p => {
       const key = p.rival.trim();
       if (!grupos[key]) {
@@ -816,7 +815,46 @@ export default function App() {
         ...calcMetricas(g.lista)
       }))
       .sort((a, b) => b.total - a.total || b.puntos - a.puntos || a.rival.localeCompare(b.rival));
+  };
+
+  // Subconjuntos por Ranking FIFA
+  const partidosTop10 = useMemo(() => partidos.filter(p => parseInt(p.ranking) <= 10), [partidos]);
+  const partidos11a20 = useMemo(() => partidos.filter(p => parseInt(p.ranking) > 10 && parseInt(p.ranking) <= 20), [partidos]);
+  const partidosTop20 = useMemo(() => partidos.filter(p => parseInt(p.ranking) <= 20), [partidos]);
+  const partidosFueraTop20 = useMemo(() => partidos.filter(p => parseInt(p.ranking) > 20), [partidos]);
+
+  const global = useMemo(() => calcMetricas(partidos), [partidos]);
+  const top10 = useMemo(() => ({ ...calcMetricas(partidosTop10), rivales: agruparPorRival(partidosTop10) }), [partidosTop10]);
+  const top11a20 = useMemo(() => ({ ...calcMetricas(partidos11a20), rivales: agruparPorRival(partidos11a20) }), [partidos11a20]);
+  const top20 = useMemo(() => ({ ...calcMetricas(partidosTop20), rivales: agruparPorRival(partidosTop20) }), [partidosTop20]);
+  const fueraTop20 = useMemo(() => ({ ...calcMetricas(partidosFueraTop20), rivales: agruparPorRival(partidosFueraTop20) }), [partidosFueraTop20]);
+
+  // Rendimiento por Confederación (con su listado de rivales desplegable)
+  const confederacionesStats = useMemo(() => {
+    const confs = ['Conmebol', 'Concacaf', 'AFC', 'OFC', 'UEFA', 'CAF'];
+    return confs
+      .map(c => {
+        const filtrados = partidos.filter(p => (p.confederacion || '').toLowerCase() === c.toLowerCase());
+        return {
+          nombre: c,
+          ...calcMetricas(filtrados),
+          rivales: agruparPorRival(filtrados)
+        };
+      })
+      .filter(c => c.total > 0)
+      .sort((a, b) => b.total - a.total || b.puntos - a.puntos);
   }, [partidos]);
+
+  // Rendimiento por Rival General (Mayor a menor cantidad de partidos)
+  const rivalesStats = useMemo(() => agruparPorRival(partidos), [partidos]);
+
+  const toggleRanking = (key) => {
+    setExpandedRankings(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleConfed = (nombre) => {
+    setExpandedConfeds(prev => ({ ...prev, [nombre]: !prev[nombre] }));
+  };
 
   // --- Lógica de Administrador ---
   const verificarPin = (e) => {
@@ -887,6 +925,14 @@ export default function App() {
 
   const nuevosPartidosFirebase = firestorePartidos.filter(p => !p.esHistorico);
 
+  const rankingRows = [
+    { key: 'total', label: 'Total General', stat: global, color: 'text-brand-dark', bar: 'bg-brand-dark', expandable: false },
+    { key: 'top10', label: 'Rivales Top 10 (Puestos 1 al 10)', stat: top10, color: 'text-red-600', bar: 'bg-red-500', expandable: true },
+    { key: 'top11a20', label: 'Rivales del 11 al 20 (Puestos 11 al 20)', stat: top11a20, color: 'text-orange-500', bar: 'bg-orange-500', expandable: true },
+    { key: 'top20', label: 'Rivales Top 20 (Acumulado 1 al 20)', stat: top20, color: 'text-amber-700', bar: 'bg-amber-500', expandable: true },
+    { key: 'fueraTop20', label: 'Rivales Fuera del Top 20 (> 20)', stat: fueraTop20, color: 'text-green-600', bar: 'bg-green-600', expandable: true }
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center pb-12">
       {/* HEADER */}
@@ -949,11 +995,14 @@ export default function App() {
               </div>
             </div>
 
-            {/* TABLA 1: RENDIMIENTO GENERAL Y POR RANKING FIFA */}
+            {/* TABLA 1: RENDIMIENTO GENERAL Y POR RANKING FIFA (CON DESPLIEGUE POR RIVAL) */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="bg-brand-dark text-white p-3.5 font-bold text-base md:text-lg flex items-center justify-center space-x-2">
-                <Trophy size={20} />
-                <span>1. Rendimiento General y por Ranking FIFA</span>
+              <div className="bg-brand-dark text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
+                <div className="font-bold text-base md:text-lg flex items-center space-x-2">
+                  <Trophy size={20} />
+                  <span>1. Rendimiento General y por Ranking FIFA</span>
+                </div>
+                <span className="text-xs text-blue-200">Haz clic en una categoría para desplegar sus rivales</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-center text-sm">
@@ -971,39 +1020,121 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { label: 'Total General', stat: global, color: 'text-brand-dark', bar: 'bg-brand-dark' },
-                      { label: 'Rivales Top 10 (Puestos 1 al 10)', stat: top10, color: 'text-red-600', bar: 'bg-red-500' },
-                      { label: 'Rivales del 11 al 20 (Puestos 11 al 20)', stat: top11a20, color: 'text-orange-500', bar: 'bg-orange-500' },
-                      { label: 'Rivales Top 20 (Acumulado 1 al 20)', stat: top20, color: 'text-amber-700', bar: 'bg-amber-500' },
-                      { label: 'Rivales Fuera del Top 20 (> 20)', stat: fueraTop20, color: 'text-green-600', bar: 'bg-green-600' }
-                    ].map((row, idx) => (
-                      <tr key={row.label} className={`border-b ${idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}>
-                        <td className="p-3 font-semibold text-left text-gray-800">{row.label}</td>
-                        <td className="p-3">{row.stat.total}</td>
-                        <td className="p-3 text-green-700 font-medium">{row.stat.ganados}</td>
-                        <td className="p-3 text-amber-700 font-medium">{row.stat.empatados}</td>
-                        <td className="p-3 text-red-700 font-medium">{row.stat.perdidos}</td>
-                        <td className="p-3 font-semibold">{row.stat.puntos}</td>
-                        <td className="p-3 text-gray-500">{row.stat.posibles}</td>
-                        <td className={`p-3 font-bold bg-blue-50/40 ${row.color}`}>{row.stat.rendimiento}%</td>
-                        <td className="p-3">
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div className={`${row.bar} h-2.5 rounded-full`} style={{ width: `${Math.min(100, row.stat.rendimientoNum)}%` }}></div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {rankingRows.map((row, idx) => {
+                      const isExpanded = !!expandedRankings[row.key];
+                      const rivalesList = row.stat.rivales || [];
+                      return (
+                        <React.Fragment key={row.key}>
+                          <tr
+                            onClick={() => row.expandable && toggleRanking(row.key)}
+                            className={`border-b transition ${
+                              row.expandable ? 'cursor-pointer hover:bg-blue-50/70' : ''
+                            } ${isExpanded ? 'bg-blue-50/50' : idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}
+                          >
+                            <td className="p-3 font-semibold text-left text-gray-800">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center space-x-2">
+                                  {row.expandable ? (
+                                    isExpanded ? (
+                                      <ChevronDown size={16} className="text-brand-light shrink-0" />
+                                    ) : (
+                                      <ChevronRight size={16} className="text-gray-400 shrink-0" />
+                                    )
+                                  ) : (
+                                    <span className="w-4 inline-block" />
+                                  )}
+                                  <span>{row.label}</span>
+                                </div>
+                                {row.expandable && (
+                                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 whitespace-nowrap">
+                                    {rivalesList.length} {rivalesList.length === 1 ? 'rival' : 'rivales'}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 font-medium">{row.stat.total}</td>
+                            <td className="p-3 text-green-700 font-medium">{row.stat.ganados}</td>
+                            <td className="p-3 text-amber-700 font-medium">{row.stat.empatados}</td>
+                            <td className="p-3 text-red-700 font-medium">{row.stat.perdidos}</td>
+                            <td className="p-3 font-semibold">{row.stat.puntos}</td>
+                            <td className="p-3 text-gray-500">{row.stat.posibles}</td>
+                            <td className={`p-3 font-bold bg-blue-50/40 ${row.color}`}>{row.stat.rendimiento}%</td>
+                            <td className="p-3">
+                              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div className={`${row.bar} h-2.5 rounded-full`} style={{ width: `${Math.min(100, row.stat.rendimientoNum)}%` }}></div>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* FILAS DESPLEGABLES CON CADA RIVAL DE LA CATEGORÍA */}
+                          {row.expandable && isExpanded && (
+                            <>
+                              <tr className="bg-slate-100/90 text-[11px] uppercase tracking-wider text-slate-600 border-b">
+                                <td className="py-1.5 px-3 pl-9 text-left font-bold" colSpan={9}>
+                                  Desglose por rival — {row.label}
+                                </td>
+                              </tr>
+                              {rivalesList.length === 0 ? (
+                                <tr className="bg-slate-50 border-b">
+                                  <td colSpan={9} className="p-3 text-xs text-gray-500 italic">
+                                    No hay partidos registrados en esta categoría.
+                                  </td>
+                                </tr>
+                              ) : (
+                                rivalesList.map((riv) => (
+                                  <tr key={`${row.key}-${riv.rival}`} className="bg-slate-50/80 hover:bg-slate-100/80 border-b border-slate-200/70 text-xs">
+                                    <td className="py-2 px-3 pl-9 text-left">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-slate-400">↳</span>
+                                        <span className="font-semibold text-gray-800">{riv.rival}</span>
+                                        <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                          riv.ranking <= 10
+                                            ? 'bg-red-100 text-red-700'
+                                            : riv.ranking <= 20
+                                            ? 'bg-amber-100 text-amber-800'
+                                            : 'bg-blue-100 text-brand-dark'
+                                        }`}>
+                                          #{riv.ranking}
+                                        </span>
+                                        <span className="text-[10px] text-gray-500">({riv.confederacion})</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-3 font-medium text-gray-700">{riv.total}</td>
+                                    <td className="py-2 px-3 text-green-700">{riv.ganados}</td>
+                                    <td className="py-2 px-3 text-amber-700">{riv.empatados}</td>
+                                    <td className="py-2 px-3 text-red-700">{riv.perdidos}</td>
+                                    <td className="py-2 px-3 font-semibold text-gray-800">{riv.puntos}</td>
+                                    <td className="py-2 px-3 text-gray-500">{riv.posibles}</td>
+                                    <td className="py-2 px-3 font-bold text-brand-dark bg-blue-50/30">{riv.rendimiento}%</td>
+                                    <td className="py-2 px-3">
+                                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                        <div
+                                          className={`${row.bar} h-1.5 rounded-full opacity-80`}
+                                          style={{ width: `${Math.min(100, riv.rendimientoNum)}%` }}
+                                        ></div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* TABLA 2: RENDIMIENTO POR CONFEDERACIÓN */}
+            {/* TABLA 2: RENDIMIENTO POR CONFEDERACIÓN (CON DESPLIEGUE POR RIVAL) */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="bg-brand-light text-white p-3.5 font-bold text-base md:text-lg flex items-center justify-center space-x-2">
-                <Globe size={20} />
-                <span>2. Rendimiento por Confederación del Rival</span>
+              <div className="bg-brand-light text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
+                <div className="font-bold text-base md:text-lg flex items-center space-x-2">
+                  <Globe size={20} />
+                  <span>2. Rendimiento por Confederación del Rival</span>
+                </div>
+                <span className="text-xs text-blue-100">Haz clic en una confederación para desplegar sus rivales</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-center text-sm">
@@ -1021,23 +1152,92 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {confederacionesStats.map((c, idx) => (
-                      <tr key={c.nombre} className={`border-b ${idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}>
-                        <td className="p-3 font-semibold text-left text-gray-800">{c.nombre}</td>
-                        <td className="p-3">{c.total}</td>
-                        <td className="p-3 text-green-700 font-medium">{c.ganados}</td>
-                        <td className="p-3 text-amber-700 font-medium">{c.empatados}</td>
-                        <td className="p-3 text-red-700 font-medium">{c.perdidos}</td>
-                        <td className="p-3 font-semibold">{c.puntos}</td>
-                        <td className="p-3 text-gray-500">{c.posibles}</td>
-                        <td className="p-3 font-bold text-brand-dark bg-blue-50/40">{c.rendimiento}%</td>
-                        <td className="p-3">
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div className="bg-brand-light h-2.5 rounded-full" style={{ width: `${Math.min(100, c.rendimientoNum)}%` }}></div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {confederacionesStats.map((c, idx) => {
+                      const isExpanded = !!expandedConfeds[c.nombre];
+                      return (
+                        <React.Fragment key={c.nombre}>
+                          <tr
+                            onClick={() => toggleConfed(c.nombre)}
+                            className={`border-b cursor-pointer transition hover:bg-blue-50/70 ${
+                              isExpanded ? 'bg-blue-50/50' : idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'
+                            }`}
+                          >
+                            <td className="p-3 font-semibold text-left text-gray-800">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center space-x-2">
+                                  {isExpanded ? (
+                                    <ChevronDown size={16} className="text-brand-light shrink-0" />
+                                  ) : (
+                                    <ChevronRight size={16} className="text-gray-400 shrink-0" />
+                                  )}
+                                  <span>{c.nombre}</span>
+                                </div>
+                                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 whitespace-nowrap">
+                                  {c.rivales.length} {c.rivales.length === 1 ? 'rival' : 'rivales'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3 font-medium">{c.total}</td>
+                            <td className="p-3 text-green-700 font-medium">{c.ganados}</td>
+                            <td className="p-3 text-amber-700 font-medium">{c.empatados}</td>
+                            <td className="p-3 text-red-700 font-medium">{c.perdidos}</td>
+                            <td className="p-3 font-semibold">{c.puntos}</td>
+                            <td className="p-3 text-gray-500">{c.posibles}</td>
+                            <td className="p-3 font-bold text-brand-dark bg-blue-50/40">{c.rendimiento}%</td>
+                            <td className="p-3">
+                              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div className="bg-brand-light h-2.5 rounded-full" style={{ width: `${Math.min(100, c.rendimientoNum)}%` }}></div>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* FILAS DESPLEGABLES CON CADA RIVAL DE LA CONFEDERACIÓN */}
+                          {isExpanded && (
+                            <>
+                              <tr className="bg-slate-100/90 text-[11px] uppercase tracking-wider text-slate-600 border-b">
+                                <td className="py-1.5 px-3 pl-9 text-left font-bold" colSpan={9}>
+                                  Rivales enfrentados — {c.nombre}
+                                </td>
+                              </tr>
+                              {c.rivales.map((riv) => (
+                                <tr key={`${c.nombre}-${riv.rival}`} className="bg-slate-50/80 hover:bg-slate-100/80 border-b border-slate-200/70 text-xs">
+                                  <td className="py-2 px-3 pl-9 text-left">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="text-slate-400">↳</span>
+                                      <span className="font-semibold text-gray-800">{riv.rival}</span>
+                                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                        riv.ranking <= 10
+                                          ? 'bg-red-100 text-red-700'
+                                          : riv.ranking <= 20
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-blue-100 text-brand-dark'
+                                      }`}>
+                                        #{riv.ranking}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 font-medium text-gray-700">{riv.total}</td>
+                                  <td className="py-2 px-3 text-green-700">{riv.ganados}</td>
+                                  <td className="py-2 px-3 text-amber-700">{riv.empatados}</td>
+                                  <td className="py-2 px-3 text-red-700">{riv.perdidos}</td>
+                                  <td className="py-2 px-3 font-semibold text-gray-800">{riv.puntos}</td>
+                                  <td className="py-2 px-3 text-gray-500">{riv.posibles}</td>
+                                  <td className="py-2 px-3 font-bold text-brand-dark bg-blue-50/30">{riv.rendimiento}%</td>
+                                  <td className="py-2 px-3">
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                      <div
+                                        className="bg-brand-light h-1.5 rounded-full opacity-80"
+                                        style={{ width: `${Math.min(100, riv.rendimientoNum)}%` }}
+                                      ></div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
