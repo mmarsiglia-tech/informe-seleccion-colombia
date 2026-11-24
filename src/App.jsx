@@ -974,7 +974,8 @@ export default function App() {
                     {[
                       { label: 'Total General', stat: global, color: 'text-brand-dark', bar: 'bg-brand-dark' },
                       { label: 'Rivales Top 10 (Puestos 1 al 10)', stat: top10, color: 'text-red-600', bar: 'bg-red-500' },
-                      { label: 'Rivales Top 20 (Puestos 1 al 20)', stat: top20, color: 'text-amber-700', bar: 'bg-amber-500' },
+                      { label: 'Rivales del 11 al 20 (Puestos 11 al 20)', stat: top11a20, color: 'text-orange-500', bar: 'bg-orange-500' },
+                      { label: 'Rivales Top 20 (Acumulado 1 al 20)', stat: top20, color: 'text-amber-700', bar: 'bg-amber-500' },
                       { label: 'Rivales Fuera del Top 20 (> 20)', stat: fueraTop20, color: 'text-green-600', bar: 'bg-green-600' }
                     ].map((row, idx) => (
                       <tr key={row.label} className={`border-b ${idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}>
