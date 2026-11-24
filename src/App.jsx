@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import {
   BarChart2,
+  Activity,
   FileText,
   Settings,
   ShieldAlert,
@@ -30,7 +31,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// BASE HISTÓRICA COMPLETA (53 PARTIDOS DEL INFORME EXCEL)
+// BASE HISTÓRICA COMPLETA (53 PARTIDOS CON ESTADÍSTICAS ACTUALIZADAS)
 const historicalData = [
   {
     "id": "hist_01",
@@ -43,6 +44,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 2,
     "confederacion": "Concacaf",
+    "remates": 3,
+    "rematesArco": 2,
+    "posesion": 46.0,
+    "pases": 333,
+    "precisionPases": 74.0,
+    "faltas": 11,
+    "amarillas": 2,
+    "rojas": 0,
+    "tirosEsquina": 1,
+    "fueraLugar": 0,
     "esHistorico": true
   },
   {
@@ -56,6 +67,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 2,
     "confederacion": "Concacaf",
+    "remates": 3,
+    "rematesArco": 2,
+    "posesion": 43.0,
+    "pases": 298,
+    "precisionPases": 73.0,
+    "faltas": 27,
+    "amarillas": 4,
+    "rojas": 0,
+    "tirosEsquina": 2,
+    "fueraLugar": 1,
     "esHistorico": true
   },
   {
@@ -69,6 +90,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 33,
     "confederacion": "OFC",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -82,6 +113,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 33,
     "confederacion": "OFC",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -95,6 +136,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 54,
     "confederacion": "Concacaf",
+    "remates": 28,
+    "rematesArco": 14,
+    "posesion": 73.0,
+    "pases": 773,
+    "precisionPases": 86.0,
+    "faltas": 8,
+    "amarillas": 1,
+    "rojas": 0,
+    "tirosEsquina": 3,
+    "fueraLugar": 1,
     "esHistorico": true
   },
   {
@@ -108,6 +159,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 7,
     "confederacion": "Conmebol",
+    "remates": 11,
+    "rematesArco": 0,
+    "posesion": 57.0,
+    "pases": 341,
+    "precisionPases": 70.0,
+    "faltas": 13,
+    "amarillas": 3,
+    "rojas": 0,
+    "tirosEsquina": 5,
+    "fueraLugar": 1,
     "esHistorico": true
   },
   {
@@ -121,6 +182,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 77,
     "confederacion": "Concacaf",
+    "remates": 11,
+    "rematesArco": 8,
+    "posesion": 73.0,
+    "pases": 654,
+    "precisionPases": 84.0,
+    "faltas": 12,
+    "amarillas": 1,
+    "rojas": 0,
+    "tirosEsquina": 3,
+    "fueraLugar": 3,
     "esHistorico": true
   },
   {
@@ -134,6 +205,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 2,
     "confederacion": "Concacaf",
+    "remates": 7,
+    "rematesArco": 3,
+    "posesion": 56.0,
+    "pases": 384,
+    "precisionPases": 66.0,
+    "faltas": 16,
+    "amarillas": 4,
+    "rojas": 0,
+    "tirosEsquina": 3,
+    "fueraLugar": 5,
     "esHistorico": true
   },
   {
@@ -147,6 +228,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 28,
     "confederacion": "Concacaf",
+    "remates": 11,
+    "rematesArco": 4,
+    "posesion": 45.0,
+    "pases": 267,
+    "precisionPases": 67.0,
+    "faltas": 14,
+    "amarillas": 1,
+    "rojas": 0,
+    "tirosEsquina": 2,
+    "fueraLugar": 3,
     "esHistorico": true
   },
   {
@@ -160,6 +251,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 82,
     "confederacion": "Concacaf",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -173,6 +274,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 42,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -186,6 +297,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 42,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -199,6 +320,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 60,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -212,6 +343,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 6,
     "confederacion": "UEFA",
+    "remates": 16,
+    "rematesArco": 4,
+    "posesion": 39.0,
+    "pases": 310,
+    "precisionPases": 75.16,
+    "faltas": 11,
+    "amarillas": 1,
+    "rojas": 1,
+    "tirosEsquina": 5,
+    "fueraLugar": 2,
     "esHistorico": true
   },
   {
@@ -225,6 +366,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 33,
     "confederacion": "OFC",
+    "remates": 18,
+    "rematesArco": 7,
+    "posesion": 64.0,
+    "pases": 567,
+    "precisionPases": 84.13,
+    "faltas": 7,
+    "amarillas": 0,
+    "rojas": 0,
+    "tirosEsquina": 8,
+    "fueraLugar": 0,
     "esHistorico": true
   },
   {
@@ -238,6 +389,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 9,
     "confederacion": "Concacaf",
+    "remates": 10,
+    "rematesArco": 5,
+    "posesion": 52.0,
+    "pases": 429,
+    "precisionPases": 79.49,
+    "faltas": 13,
+    "amarillas": 3,
+    "rojas": 0,
+    "tirosEsquina": 3,
+    "fueraLugar": 2,
     "esHistorico": true
   },
   {
@@ -251,6 +412,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 1,
     "confederacion": "UEFA",
+    "remates": 7,
+    "rematesArco": 5,
+    "posesion": 28.0,
+    "pases": 286,
+    "precisionPases": 61.54,
+    "faltas": 12,
+    "amarillas": 1,
+    "rojas": 0,
+    "tirosEsquina": 2,
+    "fueraLugar": 2,
     "esHistorico": true
   },
   {
@@ -264,6 +435,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 7,
     "confederacion": "Conmebol",
+    "remates": 7,
+    "rematesArco": 2,
+    "posesion": 40.0,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": 18,
+    "amarillas": 2,
+    "rojas": 0,
+    "tirosEsquina": 2,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -277,6 +458,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 7,
     "confederacion": "Conmebol",
+    "remates": 11,
+    "rematesArco": 3,
+    "posesion": 45.0,
+    "pases": 127,
+    "precisionPases": null,
+    "faltas": 9,
+    "amarillas": 0,
+    "rojas": 1,
+    "tirosEsquina": 4,
+    "fueraLugar": 1,
     "esHistorico": true
   },
   {
@@ -290,6 +481,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 30,
     "confederacion": "Conmebol",
+    "remates": 10,
+    "rematesArco": 5,
+    "posesion": 68.0,
+    "pases": 539,
+    "precisionPases": 77.74,
+    "faltas": 22,
+    "amarillas": 3,
+    "rojas": 0,
+    "tirosEsquina": 2,
+    "fueraLugar": 5,
     "esHistorico": true
   },
   {
@@ -303,6 +504,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 2,
     "confederacion": "Concacaf",
+    "remates": 7,
+    "rematesArco": 0,
+    "posesion": 37.0,
+    "pases": 210,
+    "precisionPases": null,
+    "faltas": 14,
+    "amarillas": 3,
+    "rojas": 0,
+    "tirosEsquina": 4,
+    "fueraLugar": 0,
     "esHistorico": true
   },
   {
@@ -316,6 +527,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 5,
     "confederacion": "AFC",
+    "remates": 5,
+    "rematesArco": 2,
+    "posesion": 40.0,
+    "pases": 317,
+    "precisionPases": null,
+    "faltas": 16,
+    "amarillas": 1,
+    "rojas": 0,
+    "tirosEsquina": 3,
+    "fueraLugar": 1,
     "esHistorico": true
   },
   {
@@ -329,6 +550,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 15,
     "confederacion": "AFC",
+    "remates": 12,
+    "rematesArco": 4,
+    "posesion": 50.0,
+    "pases": 363,
+    "precisionPases": null,
+    "faltas": 10,
+    "amarillas": 1,
+    "rojas": 0,
+    "tirosEsquina": 3,
+    "fueraLugar": 1,
     "esHistorico": true
   },
   {
@@ -342,6 +573,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 5,
     "confederacion": "AFC",
+    "remates": 1,
+    "rematesArco": 1,
+    "posesion": 36.0,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": 0,
+    "amarillas": 1,
+    "rojas": 0,
+    "tirosEsquina": 0,
+    "fueraLugar": 2,
     "esHistorico": true
   },
   {
@@ -355,6 +596,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 5,
     "confederacion": "AFC",
+    "remates": 2,
+    "rematesArco": 1,
+    "posesion": 45.0,
+    "pases": 408,
+    "precisionPases": 81.37,
+    "faltas": 9,
+    "amarillas": 1,
+    "rojas": 0,
+    "tirosEsquina": 0,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -368,6 +619,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 17,
     "confederacion": "AFC",
+    "remates": 2,
+    "rematesArco": 1,
+    "posesion": 50.0,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": 1,
+    "rojas": 0,
+    "tirosEsquina": 3,
+    "fueraLugar": 3,
     "esHistorico": true
   },
   {
@@ -381,6 +642,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 17,
     "confederacion": "AFC",
+    "remates": 13,
+    "rematesArco": 6,
+    "posesion": 50.0,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": 5,
+    "rojas": 0,
+    "tirosEsquina": 5,
+    "fueraLugar": 1,
     "esHistorico": true
   },
   {
@@ -394,6 +665,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 28,
     "confederacion": "Concacaf",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -407,6 +688,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 28,
     "confederacion": "Concacaf",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": 328,
+    "precisionPases": 78.35,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -420,6 +711,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 42,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": 233,
+    "precisionPases": 63.09,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -433,6 +734,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 44,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": 456,
+    "precisionPases": 82.02,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -446,6 +757,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 115,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": 513,
+    "precisionPases": 84.21,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -459,6 +780,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 7,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -472,6 +803,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 30,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": 404,
+    "precisionPases": 78.96,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -485,6 +826,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 7,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": 199,
+    "precisionPases": 52.76,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -498,6 +849,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 74,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -511,6 +872,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 60,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -524,6 +895,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 115,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -537,6 +918,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 9,
     "confederacion": "Concacaf",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": 450,
+    "precisionPases": 87.56,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -550,6 +941,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 30,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -563,6 +964,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 2,
     "confederacion": "Concacaf",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": 269,
+    "precisionPases": 72.12,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -576,6 +987,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 42,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -589,6 +1010,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 49,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -602,6 +1033,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 30,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -615,6 +1056,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 61,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -628,6 +1079,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 44,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -641,6 +1102,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 40,
     "confederacion": "Concacaf",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -654,6 +1125,16 @@ const historicalData = [
     "resultado": "Perdido",
     "ranking": 28,
     "confederacion": "Concacaf",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -667,6 +1148,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 77,
     "confederacion": "Concacaf",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -680,6 +1171,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 42,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -693,6 +1194,16 @@ const historicalData = [
     "resultado": "Empatado",
     "ranking": 28,
     "confederacion": "Concacaf",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -706,6 +1217,16 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 42,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   },
   {
@@ -719,18 +1240,35 @@ const historicalData = [
     "resultado": "Ganado",
     "ranking": 42,
     "confederacion": "Conmebol",
+    "remates": null,
+    "rematesArco": null,
+    "posesion": null,
+    "pases": null,
+    "precisionPases": null,
+    "faltas": null,
+    "amarillas": null,
+    "rojas": null,
+    "tirosEsquina": null,
+    "fueraLugar": null,
     "esHistorico": true
   }
 ];
 
 export default function App() {
   const [firestorePartidos, setFirestorePartidos] = useState([]);
-  const [activeTab, setActiveTab] = useState('estadisticas');
+  const [activeTab, setActiveTab] = useState('rendimiento');
   const [syncing, setSyncing] = useState(false);
 
-  // Estados para filas desplegables en Tabla 1 (Ranking FIFA) y Tabla 2 (Confederaciones)
+  // Modo de visualización en sección Estadísticas: 'totales' | 'promedios'
+  const [statsMode, setStatsMode] = useState('totales');
+
+  // Estados para filas desplegables en Rendimiento
   const [expandedRankings, setExpandedRankings] = useState({});
   const [expandedConfeds, setExpandedConfeds] = useState({});
+
+  // Estados para filas desplegables en Estadísticas
+  const [expandedStatsRankings, setExpandedStatsRankings] = useState({});
+  const [expandedStatsConfeds, setExpandedStatsConfeds] = useState({});
 
   // Estado para la protección de PIN
   const [isAdmin, setIsAdmin] = useState(false);
@@ -745,7 +1283,17 @@ export default function App() {
     golesCol: '',
     golesRiv: '',
     fecha: '',
-    tipo: 'Fecha Fifa'
+    tipo: 'Fecha Fifa',
+    remates: '',
+    rematesArco: '',
+    posesion: '',
+    pases: '',
+    precisionPases: '',
+    faltas: '',
+    amarillas: '',
+    rojas: '',
+    tirosEsquina: '',
+    fueraLugar: ''
   });
 
   // Lectura en tiempo real desde Firestore
@@ -767,7 +1315,7 @@ export default function App() {
     return Array.from(map.values()).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   }, [firestorePartidos]);
 
-  // --- Cálculos Estadísticos ---
+  // --- Cálculos de Rendimiento (Puntos y Resultados) ---
   const calcMetricas = (datos) => {
     const total = datos.length;
     const ganados = datos.filter(d => d.resultado === 'Ganado').length;
@@ -788,7 +1336,40 @@ export default function App() {
     };
   };
 
-  // Agrupar un subconjunto de partidos por rival (ordenado de mayor a menor partidos y puntos)
+  // --- Cálculos de Estadísticas de Juego (10 variables técnicas y disciplinarias) ---
+  const calcEstadisticasJuego = (datos) => {
+    const total = datos.length;
+
+    const sumarCampo = (campo) => {
+      const validos = datos
+        .map(d => d[campo])
+        .filter(v => v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v)))
+        .map(Number);
+      if (validos.length === 0) return { sum: null, avg: null, count: 0 };
+      const sum = validos.reduce((acc, v) => acc + v, 0);
+      return {
+        sum,
+        avg: sum / validos.length,
+        count: validos.length
+      };
+    };
+
+    return {
+      total,
+      remates: sumarCampo('remates'),
+      rematesArco: sumarCampo('rematesArco'),
+      posesion: sumarCampo('posesion'),
+      pases: sumarCampo('pases'),
+      precisionPases: sumarCampo('precisionPases'),
+      faltas: sumarCampo('faltas'),
+      amarillas: sumarCampo('amarillas'),
+      rojas: sumarCampo('rojas'),
+      tirosEsquina: sumarCampo('tirosEsquina'),
+      fueraLugar: sumarCampo('fueraLugar')
+    };
+  };
+
+  // Agrupar un subconjunto de partidos por rival (incluyendo tanto Rendimiento como Estadísticas de Juego)
   const agruparPorRival = (datos) => {
     const grupos = {};
     const ordenadosFecha = [...datos].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
@@ -812,7 +1393,8 @@ export default function App() {
         rival: g.rival,
         confederacion: g.confederacion,
         ranking: g.ranking,
-        ...calcMetricas(g.lista)
+        ...calcMetricas(g.lista),
+        stats: calcEstadisticasJuego(g.lista)
       }))
       .sort((a, b) => b.total - a.total || b.puntos - a.puntos || a.rival.localeCompare(b.rival));
   };
@@ -823,13 +1405,21 @@ export default function App() {
   const partidosTop20 = useMemo(() => partidos.filter(p => parseInt(p.ranking) <= 20), [partidos]);
   const partidosFueraTop20 = useMemo(() => partidos.filter(p => parseInt(p.ranking) > 20), [partidos]);
 
+  // Métricas de Rendimiento por Ranking FIFA
   const global = useMemo(() => calcMetricas(partidos), [partidos]);
   const top10 = useMemo(() => ({ ...calcMetricas(partidosTop10), rivales: agruparPorRival(partidosTop10) }), [partidosTop10]);
   const top11a20 = useMemo(() => ({ ...calcMetricas(partidos11a20), rivales: agruparPorRival(partidos11a20) }), [partidos11a20]);
   const top20 = useMemo(() => ({ ...calcMetricas(partidosTop20), rivales: agruparPorRival(partidosTop20) }), [partidosTop20]);
   const fueraTop20 = useMemo(() => ({ ...calcMetricas(partidosFueraTop20), rivales: agruparPorRival(partidosFueraTop20) }), [partidosFueraTop20]);
 
-  // Rendimiento por Confederación (con su listado de rivales desplegable)
+  // Métricas de Estadísticas de Juego por Ranking FIFA
+  const globalStats = useMemo(() => calcEstadisticasJuego(partidos), [partidos]);
+  const top10Stats = useMemo(() => ({ ...calcEstadisticasJuego(partidosTop10), rivales: agruparPorRival(partidosTop10) }), [partidosTop10]);
+  const top11a20Stats = useMemo(() => ({ ...calcEstadisticasJuego(partidos11a20), rivales: agruparPorRival(partidos11a20) }), [partidos11a20]);
+  const top20Stats = useMemo(() => ({ ...calcEstadisticasJuego(partidosTop20), rivales: agruparPorRival(partidosTop20) }), [partidosTop20]);
+  const fueraTop20Stats = useMemo(() => ({ ...calcEstadisticasJuego(partidosFueraTop20), rivales: agruparPorRival(partidosFueraTop20) }), [partidosFueraTop20]);
+
+  // Rendimiento y Estadísticas por Confederación
   const confederacionesStats = useMemo(() => {
     const confs = ['Conmebol', 'Concacaf', 'AFC', 'OFC', 'UEFA', 'CAF'];
     return confs
@@ -838,6 +1428,7 @@ export default function App() {
         return {
           nombre: c,
           ...calcMetricas(filtrados),
+          stats: calcEstadisticasJuego(filtrados),
           rivales: agruparPorRival(filtrados)
         };
       })
@@ -845,16 +1436,8 @@ export default function App() {
       .sort((a, b) => b.total - a.total || b.puntos - a.puntos);
   }, [partidos]);
 
-  // Rendimiento por Rival General (Mayor a menor cantidad de partidos)
+  // Listado general por Rival (ordenado de mayor a menor cantidad de partidos)
   const rivalesStats = useMemo(() => agruparPorRival(partidos), [partidos]);
-
-  const toggleRanking = (key) => {
-    setExpandedRankings(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const toggleConfed = (nombre) => {
-    setExpandedConfeds(prev => ({ ...prev, [nombre]: !prev[nombre] }));
-  };
 
   // --- Lógica de Administrador ---
   const verificarPin = (e) => {
@@ -867,7 +1450,7 @@ export default function App() {
     }
   };
 
-  // Subir los 53 partidos históricos a Firebase Firestore en un lote
+  // Subir los 53 partidos históricos (con estadísticas incluidas) a Firebase Firestore
   const sincronizarHistoricos = async () => {
     setSyncing(true);
     try {
@@ -877,7 +1460,7 @@ export default function App() {
         batch.set(docRef, item);
       });
       await batch.commit();
-      alert("¡Éxito! Los 53 partidos históricos quedaron guardados en tu base de datos Firebase.");
+      alert("¡Éxito! Los 53 partidos históricos y sus estadísticas quedaron guardados en Firebase.");
     } catch (error) {
       console.error(error);
       alert("Error al sincronizar: verifica que las Reglas en Firestore permitan lectura y escritura (allow read, write: if true;).");
@@ -892,6 +1475,9 @@ export default function App() {
     const gr = parseInt(formData.golesRiv);
     const res = gc > gr ? 'Ganado' : (gc === gr ? 'Empatado' : 'Perdido');
 
+    const parseOptInt = (v) => (v === '' || v === null || v === undefined ? null : parseInt(v));
+    const parseOptFloat = (v) => (v === '' || v === null || v === undefined ? null : parseFloat(v));
+
     const nuevoPartido = {
       rival: formData.rival.trim(),
       ranking: parseInt(formData.ranking),
@@ -901,13 +1487,41 @@ export default function App() {
       resultado: res,
       fecha: formData.fecha,
       tipo: formData.tipo || 'Fecha Fifa',
+      remates: parseOptInt(formData.remates),
+      rematesArco: parseOptInt(formData.rematesArco),
+      posesion: parseOptFloat(formData.posesion),
+      pases: parseOptInt(formData.pases),
+      precisionPases: parseOptFloat(formData.precisionPases),
+      faltas: parseOptInt(formData.faltas),
+      amarillas: parseOptInt(formData.amarillas),
+      rojas: parseOptInt(formData.rojas),
+      tirosEsquina: parseOptInt(formData.tirosEsquina),
+      fueraLugar: parseOptInt(formData.fueraLugar),
       esHistorico: false
     };
 
     try {
       await addDoc(collection(db, "partidos"), nuevoPartido);
-      setFormData({ rival: '', ranking: '', confederacion: 'Conmebol', golesCol: '', golesRiv: '', fecha: '', tipo: 'Fecha Fifa' });
-      alert("Partido registrado con éxito. Los informes y el análisis se han actualizado automáticamente.");
+      setFormData({
+        rival: '',
+        ranking: '',
+        confederacion: 'Conmebol',
+        golesCol: '',
+        golesRiv: '',
+        fecha: '',
+        tipo: 'Fecha Fifa',
+        remates: '',
+        rematesArco: '',
+        posesion: '',
+        pases: '',
+        precisionPases: '',
+        faltas: '',
+        amarillas: '',
+        rojas: '',
+        tirosEsquina: '',
+        fueraLugar: ''
+      });
+      alert("Partido registrado con éxito. Las secciones de Rendimiento, Estadísticas y Análisis se han actualizado.");
     } catch (error) {
       console.error(error);
       alert("Error al guardar: verifica que las Reglas de Firestore estén publicadas con allow read, write: if true;");
@@ -925,12 +1539,61 @@ export default function App() {
 
   const nuevosPartidosFirebase = firestorePartidos.filter(p => !p.esHistorico);
 
-  const rankingRows = [
+  // Formateadores para celdas de Estadísticas de Juego
+  const fmtCountStat = (obj) => {
+    if (!obj || obj.count === 0) return <span className="text-gray-300">—</span>;
+    if (statsMode === 'promedios') {
+      return (
+        <span title={`Total: ${obj.sum} en ${obj.count} partidos con dato`}>
+          {obj.avg.toFixed(1)}
+        </span>
+      );
+    }
+    return (
+      <span title={`Promedio: ${obj.avg.toFixed(1)} por partido (${obj.count} PJ con dato)`}>
+        {obj.sum.toLocaleString('es-CO')}
+      </span>
+    );
+  };
+
+  const fmtPctStat = (obj) => {
+    if (!obj || obj.count === 0) return <span className="text-gray-300">—</span>;
+    return (
+      <span title={`Promedio calculado sobre ${obj.count} partidos con registro`}>
+        {obj.avg.toFixed(1)}%
+      </span>
+    );
+  };
+
+  const renderStatsCells = (st) => (
+    <>
+      <td className="p-2.5 border-x border-gray-100">{fmtCountStat(st.remates)}</td>
+      <td className="p-2.5 border-x border-gray-100">{fmtCountStat(st.rematesArco)}</td>
+      <td className="p-2.5 border-x border-gray-100 font-medium text-brand-light">{fmtPctStat(st.posesion)}</td>
+      <td className="p-2.5 border-x border-gray-100 font-medium">{fmtCountStat(st.pases)}</td>
+      <td className="p-2.5 border-x border-gray-100 font-medium text-green-700">{fmtPctStat(st.precisionPases)}</td>
+      <td className="p-2.5 border-x border-gray-100">{fmtCountStat(st.faltas)}</td>
+      <td className="p-2.5 border-x border-gray-100 text-amber-700">{fmtCountStat(st.amarillas)}</td>
+      <td className="p-2.5 border-x border-gray-100 text-red-700">{fmtCountStat(st.rojas)}</td>
+      <td className="p-2.5 border-x border-gray-100">{fmtCountStat(st.tirosEsquina)}</td>
+      <td className="p-2.5 border-x border-gray-100">{fmtCountStat(st.fueraLugar)}</td>
+    </>
+  );
+
+  const rankingRowsRendimiento = [
     { key: 'total', label: 'Total General', stat: global, color: 'text-brand-dark', bar: 'bg-brand-dark', expandable: false },
     { key: 'top10', label: 'Rivales Top 10 (Puestos 1 al 10)', stat: top10, color: 'text-red-600', bar: 'bg-red-500', expandable: true },
     { key: 'top11a20', label: 'Rivales del 11 al 20 (Puestos 11 al 20)', stat: top11a20, color: 'text-orange-500', bar: 'bg-orange-500', expandable: true },
     { key: 'top20', label: 'Rivales Top 20 (Acumulado 1 al 20)', stat: top20, color: 'text-amber-700', bar: 'bg-amber-500', expandable: true },
     { key: 'fueraTop20', label: 'Rivales Fuera del Top 20 (> 20)', stat: fueraTop20, color: 'text-green-600', bar: 'bg-green-600', expandable: true }
+  ];
+
+  const rankingRowsEstadisticas = [
+    { key: 'total', label: 'Total General', stat: globalStats, expandable: false },
+    { key: 'top10', label: 'Rivales Top 10 (Puestos 1 al 10)', stat: top10Stats, expandable: true },
+    { key: 'top11a20', label: 'Rivales del 11 al 20 (Puestos 11 al 20)', stat: top11a20Stats, expandable: true },
+    { key: 'top20', label: 'Rivales Top 20 (Acumulado 1 al 20)', stat: top20Stats, expandable: true },
+    { key: 'fueraTop20', label: 'Rivales Fuera del Top 20 (> 20)', stat: fueraTop20Stats, expandable: true }
   ];
 
   return (
@@ -939,17 +1602,23 @@ export default function App() {
       <header className="w-full bg-brand-dark text-white p-6 shadow-md text-center">
         <h1 className="text-2xl md:text-3xl font-bold">Panel Ejecutivo: Selección Colombia Femenina</h1>
         <p className="text-sm mt-2 font-light text-blue-100">
-          Informe Estadístico, Ranking FIFA y Análisis Gerencial en Tiempo Real ({partidos.length} Partidos Analizados)
+          Rendimiento, Estadísticas de Juego, Ranking FIFA y Análisis Gerencial ({partidos.length} Partidos Analizados)
         </p>
       </header>
 
       {/* NAVEGACIÓN */}
-      <nav className="flex flex-wrap justify-center gap-2 md:space-x-4 mt-6 bg-white p-2 rounded-lg shadow">
+      <nav className="flex flex-wrap justify-center gap-2 md:space-x-3 mt-6 bg-white p-2 rounded-lg shadow">
+        <button
+          onClick={() => setActiveTab('rendimiento')}
+          className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'rendimiento' ? 'bg-brand-light text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          <BarChart2 size={18} /> <span>Rendimiento</span>
+        </button>
         <button
           onClick={() => setActiveTab('estadisticas')}
           className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'estadisticas' ? 'bg-brand-light text-white' : 'text-gray-600 hover:bg-gray-100'}`}
         >
-          <BarChart2 size={18} /> <span>Estadísticas y Tablas</span>
+          <Activity size={18} /> <span>Estadísticas</span>
         </button>
         <button
           onClick={() => setActiveTab('analisis')}
@@ -966,10 +1635,12 @@ export default function App() {
       </nav>
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="w-full max-w-6xl mt-6 px-4">
+      <main className="w-full max-w-7xl mt-6 px-4">
 
-        {/* TAB 1: ESTADÍSTICAS */}
-        {activeTab === 'estadisticas' && (
+        {/* ========================================================== */}
+        {/* TAB 1: RENDIMIENTO (ANTES ESTADÍSTICAS Y TABLAS)           */}
+        {/* ========================================================== */}
+        {activeTab === 'rendimiento' && (
           <div className="space-y-8">
             {/* TARJETAS KPI */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -995,7 +1666,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* TABLA 1: RENDIMIENTO GENERAL Y POR RANKING FIFA (CON DESPLIEGUE POR RIVAL) */}
+            {/* TABLA 1: RENDIMIENTO GENERAL Y POR RANKING FIFA */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
               <div className="bg-brand-dark text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
                 <div className="font-bold text-base md:text-lg flex items-center space-x-2">
@@ -1020,13 +1691,13 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingRows.map((row, idx) => {
+                    {rankingRowsRendimiento.map((row, idx) => {
                       const isExpanded = !!expandedRankings[row.key];
                       const rivalesList = row.stat.rivales || [];
                       return (
                         <React.Fragment key={row.key}>
                           <tr
-                            onClick={() => row.expandable && toggleRanking(row.key)}
+                            onClick={() => row.expandable && setExpandedRankings(prev => ({ ...prev, [row.key]: !prev[row.key] }))}
                             className={`border-b transition ${
                               row.expandable ? 'cursor-pointer hover:bg-blue-50/70' : ''
                             } ${isExpanded ? 'bg-blue-50/50' : idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}
@@ -1066,7 +1737,6 @@ export default function App() {
                             </td>
                           </tr>
 
-                          {/* FILAS DESPLEGABLES CON CADA RIVAL DE LA CATEGORÍA */}
                           {row.expandable && isExpanded && (
                             <>
                               <tr className="bg-slate-100/90 text-[11px] uppercase tracking-wider text-slate-600 border-b">
@@ -1074,49 +1744,41 @@ export default function App() {
                                   Desglose por rival — {row.label}
                                 </td>
                               </tr>
-                              {rivalesList.length === 0 ? (
-                                <tr className="bg-slate-50 border-b">
-                                  <td colSpan={9} className="p-3 text-xs text-gray-500 italic">
-                                    No hay partidos registrados en esta categoría.
+                              {rivalesList.map((riv) => (
+                                <tr key={`${row.key}-${riv.rival}`} className="bg-slate-50/80 hover:bg-slate-100/80 border-b border-slate-200/70 text-xs">
+                                  <td className="py-2 px-3 pl-9 text-left">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="text-slate-400">↳</span>
+                                      <span className="font-semibold text-gray-800">{riv.rival}</span>
+                                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                        riv.ranking <= 10
+                                          ? 'bg-red-100 text-red-700'
+                                          : riv.ranking <= 20
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-blue-100 text-brand-dark'
+                                      }`}>
+                                        #{riv.ranking}
+                                      </span>
+                                      <span className="text-[10px] text-gray-500">({riv.confederacion})</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 font-medium text-gray-700">{riv.total}</td>
+                                  <td className="py-2 px-3 text-green-700">{riv.ganados}</td>
+                                  <td className="py-2 px-3 text-amber-700">{riv.empatados}</td>
+                                  <td className="py-2 px-3 text-red-700">{riv.perdidos}</td>
+                                  <td className="py-2 px-3 font-semibold text-gray-800">{riv.puntos}</td>
+                                  <td className="py-2 px-3 text-gray-500">{riv.posibles}</td>
+                                  <td className="py-2 px-3 font-bold text-brand-dark bg-blue-50/30">{riv.rendimiento}%</td>
+                                  <td className="py-2 px-3">
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                      <div
+                                        className={`${row.bar} h-1.5 rounded-full opacity-80`}
+                                        style={{ width: `${Math.min(100, riv.rendimientoNum)}%` }}
+                                      ></div>
+                                    </div>
                                   </td>
                                 </tr>
-                              ) : (
-                                rivalesList.map((riv) => (
-                                  <tr key={`${row.key}-${riv.rival}`} className="bg-slate-50/80 hover:bg-slate-100/80 border-b border-slate-200/70 text-xs">
-                                    <td className="py-2 px-3 pl-9 text-left">
-                                      <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className="text-slate-400">↳</span>
-                                        <span className="font-semibold text-gray-800">{riv.rival}</span>
-                                        <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                                          riv.ranking <= 10
-                                            ? 'bg-red-100 text-red-700'
-                                            : riv.ranking <= 20
-                                            ? 'bg-amber-100 text-amber-800'
-                                            : 'bg-blue-100 text-brand-dark'
-                                        }`}>
-                                          #{riv.ranking}
-                                        </span>
-                                        <span className="text-[10px] text-gray-500">({riv.confederacion})</span>
-                                      </div>
-                                    </td>
-                                    <td className="py-2 px-3 font-medium text-gray-700">{riv.total}</td>
-                                    <td className="py-2 px-3 text-green-700">{riv.ganados}</td>
-                                    <td className="py-2 px-3 text-amber-700">{riv.empatados}</td>
-                                    <td className="py-2 px-3 text-red-700">{riv.perdidos}</td>
-                                    <td className="py-2 px-3 font-semibold text-gray-800">{riv.puntos}</td>
-                                    <td className="py-2 px-3 text-gray-500">{riv.posibles}</td>
-                                    <td className="py-2 px-3 font-bold text-brand-dark bg-blue-50/30">{riv.rendimiento}%</td>
-                                    <td className="py-2 px-3">
-                                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                        <div
-                                          className={`${row.bar} h-1.5 rounded-full opacity-80`}
-                                          style={{ width: `${Math.min(100, riv.rendimientoNum)}%` }}
-                                        ></div>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))
-                              )}
+                              ))}
                             </>
                           )}
                         </React.Fragment>
@@ -1127,7 +1789,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* TABLA 2: RENDIMIENTO POR CONFEDERACIÓN (CON DESPLIEGUE POR RIVAL) */}
+            {/* TABLA 2: RENDIMIENTO POR CONFEDERACIÓN */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
               <div className="bg-brand-light text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
                 <div className="font-bold text-base md:text-lg flex items-center space-x-2">
@@ -1157,7 +1819,7 @@ export default function App() {
                       return (
                         <React.Fragment key={c.nombre}>
                           <tr
-                            onClick={() => toggleConfed(c.nombre)}
+                            onClick={() => setExpandedConfeds(prev => ({ ...prev, [c.nombre]: !prev[c.nombre] }))}
                             className={`border-b cursor-pointer transition hover:bg-blue-50/70 ${
                               isExpanded ? 'bg-blue-50/50' : idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'
                             }`}
@@ -1191,7 +1853,6 @@ export default function App() {
                             </td>
                           </tr>
 
-                          {/* FILAS DESPLEGABLES CON CADA RIVAL DE LA CONFEDERACIÓN */}
                           {isExpanded && (
                             <>
                               <tr className="bg-slate-100/90 text-[11px] uppercase tracking-wider text-slate-600 border-b">
@@ -1243,7 +1904,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* TABLA 3: RENDIMIENTO POR RIVAL (MAYOR A MENOR PARTIDOS) */}
+            {/* TABLA 3: RENDIMIENTO POR RIVAL */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
               <div className="bg-brand-dark text-white p-3.5 font-bold text-base md:text-lg flex items-center justify-center space-x-2">
                 <Users size={20} />
@@ -1291,7 +1952,320 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 2: ANÁLISIS EJECUTIVO */}
+        {/* ========================================================== */}
+        {/* TAB 2: ESTADÍSTICAS (10 VARIABLES TÉCNICAS Y DISCIPLINA)   */}
+        {/* ========================================================== */}
+        {activeTab === 'estadisticas' && (
+          <div className="space-y-8">
+            {/* TARJETAS KPI ESTADÍSTICAS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-brand-dark">
+                <p className="text-xs text-gray-500 font-bold uppercase">Remates / Al Arco</p>
+                <p className="text-3xl font-bold text-gray-800 mt-1">
+                  {globalStats.remates.sum ?? 0} <span className="text-lg font-semibold text-brand-light">/ {globalStats.rematesArco.sum ?? 0}</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Prom: {globalStats.remates.avg ? globalStats.remates.avg.toFixed(1) : '—'} remates · {globalStats.rematesArco.avg ? globalStats.rematesArco.avg.toFixed(1) : '—'} al arco ({globalStats.remates.count} PJ)
+                </p>
+              </div>
+              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-brand-light">
+                <p className="text-xs text-gray-500 font-bold uppercase">Posesión Promedio</p>
+                <p className="text-3xl font-bold text-brand-light mt-1">
+                  {globalStats.posesion.avg ? `${globalStats.posesion.avg.toFixed(1)}%` : '—'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Calculado sobre {globalStats.posesion.count} partidos con dato</p>
+              </div>
+              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-green-600">
+                <p className="text-xs text-gray-500 font-bold uppercase">Pases y Precisión</p>
+                <p className="text-3xl font-bold text-green-600 mt-1">
+                  {globalStats.precisionPases.avg ? `${globalStats.precisionPases.avg.toFixed(1)}%` : '—'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {(globalStats.pases.sum ?? 0).toLocaleString('es-CO')} pases totales ({globalStats.pases.count} PJ)
+                </p>
+              </div>
+              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-amber-500">
+                <p className="text-xs text-gray-500 font-bold uppercase">Disciplina y Balón Parado</p>
+                <p className="text-2xl font-bold text-gray-800 mt-1">
+                  {globalStats.amarillas.sum ?? 0} <span className="text-xs font-normal text-amber-600">TA</span> · {globalStats.rojas.sum ?? 0} <span className="text-xs font-normal text-red-600">TR</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  {globalStats.faltas.sum ?? 0} faltas · {globalStats.tirosEsquina.sum ?? 0} tiros esquina · {globalStats.fueraLugar.sum ?? 0} fuera lugar
+                </p>
+              </div>
+            </div>
+
+            {/* BARRA DE CONTROL: TOTALES VS PROMEDIOS */}
+            <div className="bg-white p-4 rounded-lg shadow flex flex-col sm:flex-row items-center justify-between gap-3 border border-gray-200">
+              <div className="text-xs text-gray-600">
+                <strong className="text-brand-dark">Nota metodológica:</strong> Los valores de <em>Posesión</em> y <em>Precisión de Pases</em> corresponden siempre al promedio porcentual de los partidos con registro estadístico disponible.
+              </div>
+              <div className="flex items-center bg-gray-100 p-1 rounded-lg shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setStatsMode('totales')}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition ${statsMode === 'totales' ? 'bg-brand-dark text-white shadow' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  Totales Acumulados
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatsMode('promedios')}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition ${statsMode === 'promedios' ? 'bg-brand-dark text-white shadow' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  Promedios por Partido
+                </button>
+              </div>
+            </div>
+
+            {/* TABLA 1: ESTADÍSTICAS GENERALES Y POR RANKING FIFA */}
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="bg-brand-dark text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
+                <div className="font-bold text-base md:text-lg flex items-center space-x-2">
+                  <Trophy size={20} />
+                  <span>1. Estadísticas Generales y por Ranking FIFA</span>
+                </div>
+                <span className="text-xs text-blue-200">Haz clic en una categoría para desplegar sus rivales</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-center text-xs md:text-sm whitespace-nowrap">
+                  <thead className="bg-gray-100 text-gray-700 font-semibold">
+                    <tr>
+                      <th className="p-3 border text-left">Categoría Ranking FIFA</th>
+                      <th className="p-3 border">PJ</th>
+                      <th className="p-3 border">Remates</th>
+                      <th className="p-3 border">Rem. Arco</th>
+                      <th className="p-3 border bg-blue-50">Posesión</th>
+                      <th className="p-3 border">Pases</th>
+                      <th className="p-3 border bg-green-50">Prec. Pases</th>
+                      <th className="p-3 border">Faltas</th>
+                      <th className="p-3 border">Amarillas</th>
+                      <th className="p-3 border">Rojas</th>
+                      <th className="p-3 border">T. Esquina</th>
+                      <th className="p-3 border">Fuera Lugar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankingRowsEstadisticas.map((row, idx) => {
+                      const isExpanded = !!expandedStatsRankings[row.key];
+                      const rivalesList = row.stat.rivales || [];
+                      return (
+                        <React.Fragment key={row.key}>
+                          <tr
+                            onClick={() => row.expandable && setExpandedStatsRankings(prev => ({ ...prev, [row.key]: !prev[row.key] }))}
+                            className={`border-b transition ${
+                              row.expandable ? 'cursor-pointer hover:bg-blue-50/70' : ''
+                            } ${isExpanded ? 'bg-blue-50/50' : idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}
+                          >
+                            <td className="p-3 font-semibold text-left text-gray-800">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center space-x-2">
+                                  {row.expandable ? (
+                                    isExpanded ? (
+                                      <ChevronDown size={16} className="text-brand-light shrink-0" />
+                                    ) : (
+                                      <ChevronRight size={16} className="text-gray-400 shrink-0" />
+                                    )
+                                  ) : (
+                                    <span className="w-4 inline-block" />
+                                  )}
+                                  <span>{row.label}</span>
+                                </div>
+                                {row.expandable && (
+                                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+                                    {rivalesList.length}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-2.5 font-semibold">{row.stat.total}</td>
+                            {renderStatsCells(row.stat)}
+                          </tr>
+
+                          {row.expandable && isExpanded && (
+                            <>
+                              <tr className="bg-slate-100/90 text-[11px] uppercase tracking-wider text-slate-600 border-b">
+                                <td className="py-1.5 px-3 pl-9 text-left font-bold" colSpan={12}>
+                                  Desglose estadístico por rival — {row.label}
+                                </td>
+                              </tr>
+                              {rivalesList.map((riv) => (
+                                <tr key={`st-${row.key}-${riv.rival}`} className="bg-slate-50/80 hover:bg-slate-100/80 border-b border-slate-200/70 text-xs">
+                                  <td className="py-2 px-3 pl-9 text-left">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-slate-400">↳</span>
+                                      <span className="font-semibold text-gray-800">{riv.rival}</span>
+                                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                        riv.ranking <= 10
+                                          ? 'bg-red-100 text-red-700'
+                                          : riv.ranking <= 20
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-blue-100 text-brand-dark'
+                                      }`}>
+                                        #{riv.ranking}
+                                      </span>
+                                      <span className="text-[10px] text-gray-500">({riv.confederacion})</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-2.5 font-medium text-gray-700">{riv.total}</td>
+                                  {renderStatsCells(riv.stats)}
+                                </tr>
+                              ))}
+                            </>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* TABLA 2: ESTADÍSTICAS POR CONFEDERACIÓN DEL RIVAL */}
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="bg-brand-light text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
+                <div className="font-bold text-base md:text-lg flex items-center space-x-2">
+                  <Globe size={20} />
+                  <span>2. Estadísticas por Confederación del Rival</span>
+                </div>
+                <span className="text-xs text-blue-100">Haz clic en una confederación para desplegar sus rivales</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-center text-xs md:text-sm whitespace-nowrap">
+                  <thead className="bg-gray-100 text-gray-700 font-semibold">
+                    <tr>
+                      <th className="p-3 border text-left">Confederación</th>
+                      <th className="p-3 border">PJ</th>
+                      <th className="p-3 border">Remates</th>
+                      <th className="p-3 border">Rem. Arco</th>
+                      <th className="p-3 border bg-blue-50">Posesión</th>
+                      <th className="p-3 border">Pases</th>
+                      <th className="p-3 border bg-green-50">Prec. Pases</th>
+                      <th className="p-3 border">Faltas</th>
+                      <th className="p-3 border">Amarillas</th>
+                      <th className="p-3 border">Rojas</th>
+                      <th className="p-3 border">T. Esquina</th>
+                      <th className="p-3 border">Fuera Lugar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {confederacionesStats.map((c, idx) => {
+                      const isExpanded = !!expandedStatsConfeds[c.nombre];
+                      return (
+                        <React.Fragment key={c.nombre}>
+                          <tr
+                            onClick={() => setExpandedStatsConfeds(prev => ({ ...prev, [c.nombre]: !prev[c.nombre] }))}
+                            className={`border-b cursor-pointer transition hover:bg-blue-50/70 ${
+                              isExpanded ? 'bg-blue-50/50' : idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'
+                            }`}
+                          >
+                            <td className="p-3 font-semibold text-left text-gray-800">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center space-x-2">
+                                  {isExpanded ? (
+                                    <ChevronDown size={16} className="text-brand-light shrink-0" />
+                                  ) : (
+                                    <ChevronRight size={16} className="text-gray-400 shrink-0" />
+                                  )}
+                                  <span>{c.nombre}</span>
+                                </div>
+                                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+                                  {c.rivales.length}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-2.5 font-semibold">{c.total}</td>
+                            {renderStatsCells(c.stats)}
+                          </tr>
+
+                          {isExpanded && (
+                            <>
+                              <tr className="bg-slate-100/90 text-[11px] uppercase tracking-wider text-slate-600 border-b">
+                                <td className="py-1.5 px-3 pl-9 text-left font-bold" colSpan={12}>
+                                  Estadísticas por rival — {c.nombre}
+                                </td>
+                              </tr>
+                              {c.rivales.map((riv) => (
+                                <tr key={`st-${c.nombre}-${riv.rival}`} className="bg-slate-50/80 hover:bg-slate-100/80 border-b border-slate-200/70 text-xs">
+                                  <td className="py-2 px-3 pl-9 text-left">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-slate-400">↳</span>
+                                      <span className="font-semibold text-gray-800">{riv.rival}</span>
+                                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                        riv.ranking <= 10
+                                          ? 'bg-red-100 text-red-700'
+                                          : riv.ranking <= 20
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-blue-100 text-brand-dark'
+                                      }`}>
+                                        #{riv.ranking}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-2.5 font-medium text-gray-700">{riv.total}</td>
+                                  {renderStatsCells(riv.stats)}
+                                </tr>
+                              ))}
+                            </>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* TABLA 3: ESTADÍSTICAS POR RIVAL (ORDENADO DE MAYOR A MENOR CANTIDAD DE PARTIDOS) */}
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="bg-brand-dark text-white p-3.5 font-bold text-base md:text-lg flex items-center justify-center space-x-2">
+                <Users size={20} />
+                <span>3. Estadísticas por Rival (Ordenado de Mayor a Menor Cantidad de Partidos)</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-center text-xs md:text-sm whitespace-nowrap">
+                  <thead className="bg-gray-100 text-gray-700 font-semibold">
+                    <tr>
+                      <th className="p-3 border text-left">Rival</th>
+                      <th className="p-3 border">Confed.</th>
+                      <th className="p-3 border">Ranking</th>
+                      <th className="p-3 border">PJ</th>
+                      <th className="p-3 border">Remates</th>
+                      <th className="p-3 border">Rem. Arco</th>
+                      <th className="p-3 border bg-blue-50">Posesión</th>
+                      <th className="p-3 border">Pases</th>
+                      <th className="p-3 border bg-green-50">Prec. Pases</th>
+                      <th className="p-3 border">Faltas</th>
+                      <th className="p-3 border">Amarillas</th>
+                      <th className="p-3 border">Rojas</th>
+                      <th className="p-3 border">T. Esquina</th>
+                      <th className="p-3 border">Fuera Lugar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rivalesStats.map((r, idx) => (
+                      <tr key={r.rival} className={`border-b ${idx % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}>
+                        <td className="p-3 font-semibold text-left text-gray-800">{r.rival}</td>
+                        <td className="p-2.5 text-gray-600">{r.confederacion}</td>
+                        <td className="p-2.5">
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${r.ranking <= 10 ? 'bg-red-100 text-red-700' : r.ranking <= 20 ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-brand-dark'}`}>
+                            #{r.ranking}
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-semibold">{r.total}</td>
+                        {renderStatsCells(r.stats)}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================== */}
+        {/* TAB 3: ANÁLISIS EJECUTIVO                                  */}
+        {/* ========================================================== */}
         {activeTab === 'analisis' && (
           <div className="bg-white shadow-lg rounded-lg p-6 md:p-8 border-t-8 border-brand-dark space-y-6">
             <div className="border-b pb-4">
@@ -1349,9 +2323,11 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: FORMULARIO PROTEGIDO */}
+        {/* ========================================================== */}
+        {/* TAB 4: FORMULARIO PROTEGIDO                                */}
+        {/* ========================================================== */}
         {activeTab === 'formulario' && (
-          <div className="max-w-2xl mx-auto space-y-6">
+          <div className="max-w-3xl mx-auto space-y-6">
             {!isAdmin ? (
               <div className="bg-white p-8 rounded-lg shadow-md text-center border-t-4 border-red-600 max-w-md mx-auto">
                 <ShieldAlert className="mx-auto text-red-600 mb-4" size={48} />
@@ -1378,10 +2354,10 @@ export default function App() {
                   <div>
                     <h3 className="font-bold text-brand-dark flex items-center space-x-2">
                       <CheckCircle2 size={18} className="text-green-600" />
-                      <span>Base Histórica (53 Partidos)</span>
+                      <span>Base Histórica (53 Partidos + Estadísticas)</span>
                     </h3>
                     <p className="text-xs text-gray-600 mt-1">
-                      Los 53 partidos ya están cargados en los informes. Si deseas guardarlos también físicamente dentro de tu consola de Firebase Firestore, pulsa el botón:
+                      Sincroniza los 53 partidos históricos junto con sus estadísticas actualizadas de remates, posesión, pases y disciplina en Firebase Firestore:
                     </p>
                   </div>
                   <button
@@ -1391,104 +2367,232 @@ export default function App() {
                     className="whitespace-nowrap bg-brand-dark text-white text-xs font-bold px-4 py-2.5 rounded hover:bg-brand-light transition flex items-center space-x-2 disabled:opacity-50"
                   >
                     <UploadCloud size={16} />
-                    <span>{syncing ? 'Subiendo...' : 'Subir 53 a Firebase'}</span>
+                    <span>{syncing ? 'Subiendo...' : 'Actualizar 53 en Firebase'}</span>
                   </button>
                 </div>
 
                 {/* FORMULARIO DE NUEVO PARTIDO */}
-                <form onSubmit={handleSubmit} className="bg-white p-6 shadow-md rounded-lg space-y-4 border-t-4 border-brand-dark">
-                  <div className="flex justify-between items-center mb-2 border-b pb-3">
+                <form onSubmit={handleSubmit} className="bg-white p-6 shadow-md rounded-lg space-y-5 border-t-4 border-brand-dark">
+                  <div className="flex justify-between items-center border-b pb-3">
                     <h2 className="text-xl font-bold text-brand-dark">Registrar Nuevo Partido (#{partidos.length + 1})</h2>
                     <button type="button" onClick={() => setIsAdmin(false)} className="text-sm text-gray-500 hover:text-red-600">
                       Cerrar Sesión
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm font-bold text-gray-700">Selección Rival</label>
-                      <input
-                        required
-                        type="text"
-                        placeholder="Ej. Alemania, Argentina, Estados Unidos..."
-                        value={formData.rival}
-                        onChange={e => setFormData({ ...formData, rival: e.target.value })}
-                        className="w-full p-2.5 border rounded mt-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700">Ranking FIFA del Rival</label>
-                      <input
-                        required
-                        type="number"
-                        min="1"
-                        placeholder="Ej. 12"
-                        value={formData.ranking}
-                        onChange={e => setFormData({ ...formData, ranking: e.target.value })}
-                        className="w-full p-2.5 border rounded mt-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700">Confederación</label>
-                      <select
-                        required
-                        value={formData.confederacion}
-                        onChange={e => setFormData({ ...formData, confederacion: e.target.value })}
-                        className="w-full p-2.5 border rounded mt-1"
-                      >
-                        <option value="Conmebol">Conmebol</option>
-                        <option value="Concacaf">Concacaf</option>
-                        <option value="UEFA">UEFA</option>
-                        <option value="AFC">AFC</option>
-                        <option value="OFC">OFC</option>
-                        <option value="CAF">CAF</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700">Goles Colombia</label>
-                      <input
-                        required
-                        type="number"
-                        min="0"
-                        value={formData.golesCol}
-                        onChange={e => setFormData({ ...formData, golesCol: e.target.value })}
-                        className="w-full p-2.5 border rounded mt-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700">Goles Rival</label>
-                      <input
-                        required
-                        type="number"
-                        min="0"
-                        value={formData.golesRiv}
-                        onChange={e => setFormData({ ...formData, golesRiv: e.target.value })}
-                        className="w-full p-2.5 border rounded mt-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700">Fecha del Partido</label>
-                      <input
-                        required
-                        type="date"
-                        value={formData.fecha}
-                        onChange={e => setFormData({ ...formData, fecha: e.target.value })}
-                        className="w-full p-2.5 border rounded mt-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700">Competencia / Tipo</label>
-                      <input
-                        type="text"
-                        placeholder="Ej. Fecha Fifa, Copa América..."
-                        value={formData.tipo}
-                        onChange={e => setFormData({ ...formData, tipo: e.target.value })}
-                        className="w-full p-2.5 border rounded mt-1"
-                      />
+                  {/* DATOS BÁSICOS Y MARCADOR */}
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-brand-light mb-3">1. Datos del Encuentro y Resultado</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-bold text-gray-700">Selección Rival *</label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="Ej. Alemania, Argentina, Estados Unidos..."
+                          value={formData.rival}
+                          onChange={e => setFormData({ ...formData, rival: e.target.value })}
+                          className="w-full p-2.5 border rounded mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700">Ranking FIFA del Rival *</label>
+                        <input
+                          required
+                          type="number"
+                          min="1"
+                          placeholder="Ej. 12"
+                          value={formData.ranking}
+                          onChange={e => setFormData({ ...formData, ranking: e.target.value })}
+                          className="w-full p-2.5 border rounded mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700">Confederación *</label>
+                        <select
+                          required
+                          value={formData.confederacion}
+                          onChange={e => setFormData({ ...formData, confederacion: e.target.value })}
+                          className="w-full p-2.5 border rounded mt-1"
+                        >
+                          <option value="Conmebol">Conmebol</option>
+                          <option value="Concacaf">Concacaf</option>
+                          <option value="UEFA">UEFA</option>
+                          <option value="AFC">AFC</option>
+                          <option value="OFC">OFC</option>
+                          <option value="CAF">CAF</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700">Goles Colombia *</label>
+                        <input
+                          required
+                          type="number"
+                          min="0"
+                          value={formData.golesCol}
+                          onChange={e => setFormData({ ...formData, golesCol: e.target.value })}
+                          className="w-full p-2.5 border rounded mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700">Goles Rival *</label>
+                        <input
+                          required
+                          type="number"
+                          min="0"
+                          value={formData.golesRiv}
+                          onChange={e => setFormData({ ...formData, golesRiv: e.target.value })}
+                          className="w-full p-2.5 border rounded mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700">Fecha del Partido *</label>
+                        <input
+                          required
+                          type="date"
+                          value={formData.fecha}
+                          onChange={e => setFormData({ ...formData, fecha: e.target.value })}
+                          className="w-full p-2.5 border rounded mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700">Competencia / Tipo</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Fecha Fifa, Copa América..."
+                          value={formData.tipo}
+                          onChange={e => setFormData({ ...formData, tipo: e.target.value })}
+                          className="w-full p-2.5 border rounded mt-1"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-brand-light text-white font-bold py-3 mt-4 rounded hover:bg-brand-dark transition">
-                    Guardar Resultado en la Base de Datos
+
+                  {/* ESTADÍSTICAS DEL PARTIDO (OPCIONAL) */}
+                  <div className="border-t pt-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-brand-light mb-3">
+                      2. Estadísticas de Juego de Colombia (Opcional)
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Remates</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Ej. 14"
+                          value={formData.remates}
+                          onChange={e => setFormData({ ...formData, remates: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Rem. al Arco</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Ej. 6"
+                          value={formData.rematesArco}
+                          onChange={e => setFormData({ ...formData, rematesArco: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Posesión (%)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          placeholder="Ej. 58.5"
+                          value={formData.posesion}
+                          onChange={e => setFormData({ ...formData, posesion: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Pases Totales</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Ej. 420"
+                          value={formData.pases}
+                          onChange={e => setFormData({ ...formData, pases: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Prec. Pases (%)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          placeholder="Ej. 81.2"
+                          value={formData.precisionPases}
+                          onChange={e => setFormData({ ...formData, precisionPases: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Faltas</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Ej. 12"
+                          value={formData.faltas}
+                          onChange={e => setFormData({ ...formData, faltas: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Amarillas</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Ej. 2"
+                          value={formData.amarillas}
+                          onChange={e => setFormData({ ...formData, amarillas: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Rojas</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Ej. 0"
+                          value={formData.rojas}
+                          onChange={e => setFormData({ ...formData, rojas: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">T. Esquina</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Ej. 5"
+                          value={formData.tirosEsquina}
+                          onChange={e => setFormData({ ...formData, tirosEsquina: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Fuera Lugar</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Ej. 2"
+                          value={formData.fueraLugar}
+                          onChange={e => setFormData({ ...formData, fueraLugar: e.target.value })}
+                          className="w-full p-2 border rounded mt-1 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="w-full bg-brand-light text-white font-bold py-3 mt-2 rounded hover:bg-brand-dark transition">
+                    Guardar Resultado y Estadísticas
                   </button>
                 </form>
 
