@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
 import {
   BarChart2,
   Activity,
@@ -14,7 +14,11 @@ import {
   Globe,
   Users,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Award,
+  Edit3,
+  Save,
+  X
 } from 'lucide-react';
 
 // CONFIGURACIÓN DE FIREBASE CONECTADA
@@ -1254,10 +1258,53 @@ const historicalData = [
   }
 ];
 
+// PLANTILLA INICIAL DEL CUERPO TÉCNICO
+const defaultCuerpoTecnico = [
+  {
+    id: 'dt',
+    cargo: 'Director Técnico',
+    nombre: 'Angelo Marsiglia',
+    especialidad: 'Licencia Pro CONMEBOL · Dirección Técnica y Modelo de Juego',
+    resena:
+      'Director Técnico de la Selección Colombia Femenina Categoría Mayores. Lidera la planificación estratégica, el modelo táctico y la gestión competitiva del combinado nacional en ciclos de Copa América, Juegos Olímpicos, Liga de Naciones CONMEBOL y preparación mundialista.'
+  },
+  {
+    id: 'at',
+    cargo: 'Asistente Técnico',
+    nombre: 'Integrante por definir',
+    especialidad: 'Análisis Táctico, Planificación de Sesiones y Scouting de Rivales',
+    resena:
+      'Encargado de apoyar el diseño metodológico de los entrenamientos, el análisis táctico previo y posterior a cada encuentro internacional y el seguimiento individualizado de las jugadoras convocadas.'
+  },
+  {
+    id: 'pf',
+    cargo: 'Preparador Físico',
+    nombre: 'Integrante por definir',
+    especialidad: 'Alto Rendimiento, Control de Cargas y Prevención de Lesiones',
+    resena:
+      'Responsable de la periodización física, el monitoreo de cargas de entrenamiento y competencia mediante tecnología GPS, y la optimización de la capacidad condicional de las futbolistas durante las concentraciones y torneos.'
+  },
+  {
+    id: 'pa',
+    cargo: 'Preparador de Arqueros',
+    nombre: 'Integrante por definir',
+    especialidad: 'Entrenamiento Específico de Porteras y Balón Parado Defensivo',
+    resena:
+      'Encargado del desarrollo técnico, táctico y condicional de las guardametas de la Selección Colombia Mayores, así como del análisis de finalización y acciones a balón parado de los rivales.'
+  }
+];
+
 export default function App() {
   const [firestorePartidos, setFirestorePartidos] = useState([]);
   const [activeTab, setActiveTab] = useState('rendimiento');
   const [syncing, setSyncing] = useState(false);
+
+  // Estado para Cuerpo Técnico (sincronizado con Firebase)
+  const [cuerpoTecnico, setCuerpoTecnico] = useState(defaultCuerpoTecnico);
+  const [editingStaff, setEditingStaff] = useState(false);
+  const [staffDraft, setStaffDraft] = useState(defaultCuerpoTecnico);
+  const [savingStaff, setSavingStaff] = useState(false);
+  const [showStaffPinModal, setShowStaffPinModal] = useState(false);
 
   // Modo de visualización en sección Estadísticas: 'totales' | 'promedios'
   const [statsMode, setStatsMode] = useState('totales');
@@ -1275,7 +1322,7 @@ export default function App() {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
 
-  // Formulario
+  // Formulario de nuevos partidos
   const [formData, setFormData] = useState({
     rival: '',
     ranking: '',
@@ -1296,13 +1343,26 @@ export default function App() {
     fueraLugar: ''
   });
 
-  // Lectura en tiempo real desde Firestore
+  // Lectura en tiempo real de partidos desde Firestore
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "partidos"), (snapshot) => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setFirestorePartidos(data);
     }, (error) => {
-      console.error("Error leyendo Firestore:", error);
+      console.error("Error leyendo Firestore (partidos):", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Lectura en tiempo real del Cuerpo Técnico desde Firestore
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, "configuracion", "cuerpo_tecnico"), (docSnap) => {
+      if (docSnap.exists() && Array.isArray(docSnap.data().integrantes) && docSnap.data().integrantes.length > 0) {
+        setCuerpoTecnico(docSnap.data().integrantes);
+        setStaffDraft(docSnap.data().integrantes);
+      }
+    }, (error) => {
+      console.error("Error leyendo Firestore (cuerpo_tecnico):", error);
     });
     return () => unsubscribe();
   }, []);
@@ -1315,12 +1375,14 @@ export default function App() {
     return Array.from(map.values()).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   }, [firestorePartidos]);
 
-  // --- Cálculos de Rendimiento (Puntos y Resultados) ---
+  // --- Cálculos de Rendimiento (Puntos, Goles y Resultados) ---
   const calcMetricas = (datos) => {
     const total = datos.length;
     const ganados = datos.filter(d => d.resultado === 'Ganado').length;
     const empatados = datos.filter(d => d.resultado === 'Empatado').length;
     const perdidos = datos.filter(d => d.resultado === 'Perdido').length;
+    const golesFavor = datos.reduce((acc, d) => acc + (Number(d.golesCol) || 0), 0);
+    const golesContra = datos.reduce((acc, d) => acc + (Number(d.golesRiv) || 0), 0);
     const puntos = (ganados * 3) + empatados;
     const posibles = total * 3;
     const rendimiento = total > 0 ? ((puntos / posibles) * 100) : 0;
@@ -1329,6 +1391,9 @@ export default function App() {
       ganados,
       empatados,
       perdidos,
+      golesFavor,
+      golesContra,
+      diferenciaGoles: golesFavor - golesContra,
       puntos,
       posibles,
       rendimientoNum: rendimiento,
@@ -1354,10 +1419,18 @@ export default function App() {
       };
     };
 
+    const remates = sumarCampo('remates');
+    const rematesArco = sumarCampo('rematesArco');
+    const efectividadRemate =
+      remates.sum && remates.sum > 0 && rematesArco.sum !== null
+        ? (rematesArco.sum / remates.sum) * 100
+        : null;
+
     return {
       total,
-      remates: sumarCampo('remates'),
-      rematesArco: sumarCampo('rematesArco'),
+      remates,
+      rematesArco,
+      efectividadRemate,
       posesion: sumarCampo('posesion'),
       pases: sumarCampo('pases'),
       precisionPases: sumarCampo('precisionPases'),
@@ -1369,7 +1442,7 @@ export default function App() {
     };
   };
 
-  // Agrupar un subconjunto de partidos por rival (incluyendo tanto Rendimiento como Estadísticas de Juego)
+  // Agrupar un subconjunto de partidos por rival
   const agruparPorRival = (datos) => {
     const grupos = {};
     const ordenadosFecha = [...datos].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
@@ -1436,8 +1509,37 @@ export default function App() {
       .sort((a, b) => b.total - a.total || b.puntos - a.puntos);
   }, [partidos]);
 
-  // Listado general por Rival (ordenado de mayor a menor cantidad de partidos)
+  // Listado general por Rival
   const rivalesStats = useMemo(() => agruparPorRival(partidos), [partidos]);
+
+  // --- Diagnósticos dinámicos para la sección Análisis ---
+  const analisisDinamico = useMemo(() => {
+    const mejorConfed = [...confederacionesStats].sort((a, b) => b.rendimientoNum - a.rendimientoNum)[0];
+    const menorConfed = [...confederacionesStats].sort((a, b) => a.rendimientoNum - b.rendimientoNum)[0];
+    const conmebolStat = confederacionesStats.find(c => c.nombre === 'Conmebol');
+
+    const estadoGlobal =
+      global.rendimientoNum >= 60
+        ? { etiqueta: 'Rendimiento Alto / Consolidado', badge: 'bg-green-100 text-green-800 border-green-300' }
+        : global.rendimientoNum >= 50
+        ? { etiqueta: 'Rendimiento Competitivo Positivo', badge: 'bg-blue-100 text-brand-dark border-blue-300' }
+        : { etiqueta: 'En Fase de Ajuste Competitivo', badge: 'bg-amber-100 text-amber-800 border-amber-300' };
+
+    const brechaPuntosTop10 = (fueraTop20.rendimientoNum - top10.rendimientoNum).toFixed(2);
+    const brechaPosesionTop10 =
+      fueraTop20Stats.posesion.avg !== null && top10Stats.posesion.avg !== null
+        ? (fueraTop20Stats.posesion.avg - top10Stats.posesion.avg).toFixed(1)
+        : null;
+
+    return {
+      mejorConfed,
+      menorConfed,
+      conmebolStat,
+      estadoGlobal,
+      brechaPuntosTop10,
+      brechaPosesionTop10
+    };
+  }, [global, top10, fueraTop20, top10Stats, fueraTop20Stats, confederacionesStats]);
 
   // --- Lógica de Administrador ---
   const verificarPin = (e) => {
@@ -1445,12 +1547,53 @@ export default function App() {
     if (pinInput === '2026') {
       setIsAdmin(true);
       setPinError(false);
+      if (showStaffPinModal) {
+        setShowStaffPinModal(false);
+        setStaffDraft(cuerpoTecnico);
+        setEditingStaff(true);
+      }
     } else {
       setPinError(true);
     }
   };
 
-  // Subir los 53 partidos históricos (con estadísticas incluidas) a Firebase Firestore
+  const iniciarEdicionStaff = () => {
+    if (isAdmin) {
+      setStaffDraft(cuerpoTecnico);
+      setEditingStaff(true);
+    } else {
+      setPinInput('');
+      setPinError(false);
+      setShowStaffPinModal(true);
+    }
+  };
+
+  const handleStaffFieldChange = (id, field, value) => {
+    setStaffDraft(prev =>
+      prev.map(item => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const guardarCuerpoTecnico = async (e) => {
+    e.preventDefault();
+    setSavingStaff(true);
+    try {
+      await setDoc(doc(db, "configuracion", "cuerpo_tecnico"), {
+        integrantes: staffDraft,
+        actualizadoEn: new Date().toISOString()
+      });
+      setCuerpoTecnico(staffDraft);
+      setEditingStaff(false);
+      alert("Reseñas del Cuerpo Técnico actualizadas correctamente en Firebase.");
+    } catch (error) {
+      console.error(error);
+      alert("Error al guardar: verifica que las Reglas de Firestore estén publicadas con allow read, write: if true;");
+    } finally {
+      setSavingStaff(false);
+    }
+  };
+
+  // Subir los 53 partidos históricos a Firebase Firestore
   const sincronizarHistoricos = async () => {
     setSyncing(true);
     try {
@@ -1600,14 +1743,16 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center pb-12">
       {/* HEADER */}
       <header className="w-full bg-brand-dark text-white p-6 shadow-md text-center">
-        <h1 className="text-2xl md:text-3xl font-bold">Panel Ejecutivo: Selección Colombia Femenina</h1>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
+          Selección Colombia Femenina Mayores - Cuerpo Técnico Angelo Marsiglia
+        </h1>
         <p className="text-sm mt-2 font-light text-blue-100">
           Rendimiento, Estadísticas de Juego, Ranking FIFA y Análisis Gerencial ({partidos.length} Partidos Analizados)
         </p>
       </header>
 
       {/* NAVEGACIÓN */}
-      <nav className="flex flex-wrap justify-center gap-2 md:space-x-3 mt-6 bg-white p-2 rounded-lg shadow">
+      <nav className="flex flex-wrap justify-center gap-2 md:space-x-2 mt-6 bg-white p-2 rounded-lg shadow">
         <button
           onClick={() => setActiveTab('rendimiento')}
           className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'rendimiento' ? 'bg-brand-light text-white' : 'text-gray-600 hover:bg-gray-100'}`}
@@ -1624,7 +1769,13 @@ export default function App() {
           onClick={() => setActiveTab('analisis')}
           className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'analisis' ? 'bg-brand-light text-white' : 'text-gray-600 hover:bg-gray-100'}`}
         >
-          <FileText size={18} /> <span>Análisis Ejecutivo</span>
+          <FileText size={18} /> <span>Análisis</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('cuerpo_tecnico')}
+          className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'cuerpo_tecnico' ? 'bg-brand-light text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          <Award size={18} /> <span>Cuerpo Técnico</span>
         </button>
         <button
           onClick={() => setActiveTab('formulario')}
@@ -1638,7 +1789,7 @@ export default function App() {
       <main className="w-full max-w-7xl mt-6 px-4">
 
         {/* ========================================================== */}
-        {/* TAB 1: RENDIMIENTO (ANTES ESTADÍSTICAS Y TABLAS)           */}
+        {/* TAB 1: RENDIMIENTO                                         */}
         {/* ========================================================== */}
         {activeTab === 'rendimiento' && (
           <div className="space-y-8">
@@ -2216,7 +2367,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* TABLA 3: ESTADÍSTICAS POR RIVAL (ORDENADO DE MAYOR A MENOR CANTIDAD DE PARTIDOS) */}
+            {/* TABLA 3: ESTADÍSTICAS POR RIVAL */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
               <div className="bg-brand-dark text-white p-3.5 font-bold text-base md:text-lg flex items-center justify-center space-x-2">
                 <Users size={20} />
@@ -2264,59 +2415,155 @@ export default function App() {
         )}
 
         {/* ========================================================== */}
-        {/* TAB 3: ANÁLISIS EJECUTIVO                                  */}
+        {/* TAB 3: ANÁLISIS (RESULTADOS + ESTADÍSTICAS DINÁMICAS)      */}
         {/* ========================================================== */}
         {activeTab === 'analisis' && (
           <div className="bg-white shadow-lg rounded-lg p-6 md:p-8 border-t-8 border-brand-dark space-y-6">
-            <div className="border-b pb-4">
-              <h2 className="text-2xl font-bold text-brand-dark">Análisis Ejecutivo: Rendimiento de la Selección Colombia Femenina</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Evaluación automatizada actualizada sobre la base de <strong>{global.total} partidos</strong> ({global.puntos} de {global.posibles} puntos posibles).
-              </p>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b pb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-brand-dark">
+                  Análisis Integral: Resultados y Estadísticas de Juego
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Diagnóstico automatizado en tiempo real sobre <strong>{global.total} partidos</strong> ({global.puntos} de {global.posibles} pts) y cobertura estadística de <strong>{globalStats.remates.count} partidos</strong> técnicos / <strong>{globalStats.pases.count} partidos</strong> de distribución.
+                </p>
+              </div>
+              <span className={`self-start md:self-center px-3 py-1 rounded-full text-xs font-bold border ${analisisDinamico.estadoGlobal.badge}`}>
+                {analisisDinamico.estadoGlobal.etiqueta} ({global.rendimiento}%)
+              </span>
+            </div>
+
+            {/* RESUMEN EJECUTIVO DE INDICADORES COMBINADOS */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                <p className="text-[11px] font-bold uppercase text-gray-500">Balance de Resultados</p>
+                <p className="text-lg font-bold text-brand-dark mt-0.5">{global.ganados}G · {global.empatados}E · {global.perdidos}P</p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Goles: <strong>{global.golesFavor}</strong> a favor / <strong>{global.golesContra}</strong> en contra ({global.diferenciaGoles >= 0 ? `+${global.diferenciaGoles}` : global.diferenciaGoles})
+                </p>
+              </div>
+              <div className="bg-blue-50/70 p-3.5 rounded-lg border border-blue-200">
+                <p className="text-[11px] font-bold uppercase text-gray-500">Producción Ofensiva</p>
+                <p className="text-lg font-bold text-brand-light mt-0.5">
+                  {globalStats.remates.avg ? `${globalStats.remates.avg.toFixed(1)} rem/PJ` : '—'}
+                </p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Al arco: <strong>{globalStats.rematesArco.avg ? globalStats.rematesArco.avg.toFixed(1) : '—'}/PJ</strong>
+                  {globalStats.efectividadRemate !== null ? ` (${globalStats.efectividadRemate.toFixed(1)}% puntería)` : ''}
+                </p>
+              </div>
+              <div className="bg-green-50/70 p-3.5 rounded-lg border border-green-200">
+                <p className="text-[11px] font-bold uppercase text-gray-500">Control y Circulación</p>
+                <p className="text-lg font-bold text-green-700 mt-0.5">
+                  {globalStats.posesion.avg ? `${globalStats.posesion.avg.toFixed(1)}% pos.` : '—'}
+                </p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Pases: <strong>{globalStats.pases.avg ? Math.round(globalStats.pases.avg) : '—'}/PJ</strong> · Precisión: <strong>{globalStats.precisionPases.avg ? `${globalStats.precisionPases.avg.toFixed(1)}%` : '—'}</strong>
+                </p>
+              </div>
+              <div className="bg-amber-50/70 p-3.5 rounded-lg border border-amber-200">
+                <p className="text-[11px] font-bold uppercase text-gray-500">Disciplina y Balón Parado</p>
+                <p className="text-lg font-bold text-amber-800 mt-0.5">
+                  {globalStats.amarillas.sum ?? 0} TA · {globalStats.rojas.sum ?? 0} TR
+                </p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Faltas: <strong>{globalStats.faltas.avg ? globalStats.faltas.avg.toFixed(1) : '—'}/PJ</strong> · Córners: <strong>{globalStats.tirosEsquina.avg ? globalStats.tirosEsquina.avg.toFixed(1) : '—'}/PJ</strong>
+                </p>
+              </div>
             </div>
 
             <div className="space-y-5 text-gray-700 leading-relaxed">
+              {/* SECCIÓN 1: RESULTADOS + ESTADÍSTICAS GLOBALES */}
               <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
-                <h3 className="font-bold text-brand-dark text-lg mb-2">1. Posicionamiento Global y Continental (Ranking FIFA)</h3>
+                <h3 className="font-bold text-brand-dark text-lg mb-2">
+                  1. Balance Global de Resultados y Comportamiento Estadístico
+                </h3>
                 <p>
-                  La Selección Colombia Femenina se consolida en el puesto 19 del Ranking FIFA como la segunda potencia de la Conmebol, únicamente detrás de Brasil (#7) y superando de forma sostenida a Argentina (#30) y al resto de selecciones sudamericanas. En el ámbito global, compite directamente en el bloque de selecciones emergentes junto a Corea del Sur (#17), China (#18) y Bélgica (#20), acumulando actualmente un rendimiento global del <strong>{global.rendimiento}%</strong> ({global.ganados} victorias, {global.empatados} empates y {global.perdidos} derrotas).
+                  Bajo la conducción del Cuerpo Técnico encabezado por <strong>Angelo Marsiglia</strong>, la Selección Colombia Femenina Mayores registra un rendimiento global del <strong>{global.rendimiento}%</strong> tras disputar <strong>{global.total} partidos</strong> ({global.ganados} victorias, {global.empatados} empates y {global.perdidos} derrotas), con un saldo goleador de <strong>{global.golesFavor} goles anotados</strong> frente a <strong>{global.golesContra} recibidos</strong> (diferencia de <strong>{global.diferenciaGoles >= 0 ? `+${global.diferenciaGoles}` : global.diferenciaGoles}</strong>).
+                </p>
+                <p className="mt-2">
+                  En el plano estadístico de juego, el equipo sostiene una posesión promedio del <strong>{globalStats.posesion.avg ? `${globalStats.posesion.avg.toFixed(1)}%` : 'N/D'}</strong>, ejecuta un promedio de <strong>{globalStats.pases.avg ? Math.round(globalStats.pases.avg) : 'N/D'} pases por encuentro</strong> con una efectividad de entrega del <strong>{globalStats.precisionPases.avg ? `${globalStats.precisionPases.avg.toFixed(1)}%` : 'N/D'}</strong>, y genera <strong>{globalStats.remates.avg ? globalStats.remates.avg.toFixed(1) : 'N/D'} remates totales</strong> por partido (<strong>{globalStats.rematesArco.avg ? globalStats.rematesArco.avg.toFixed(1) : 'N/D'} directos al arco</strong>
+                  {globalStats.efectividadRemate !== null ? `, equivalente a un ${globalStats.efectividadRemate.toFixed(1)}% de precisión en el disparo` : ''}). En balón parado y disciplina acumula <strong>{globalStats.tirosEsquina.sum ?? 0} tiros de esquina</strong> ({globalStats.tirosEsquina.avg ? globalStats.tirosEsquina.avg.toFixed(1) : '0'}/PJ), <strong>{globalStats.fueraLugar.sum ?? 0} fueras de lugar</strong>, <strong>{globalStats.faltas.sum ?? 0} faltas cometidas</strong> ({globalStats.faltas.avg ? globalStats.faltas.avg.toFixed(1) : '0'}/PJ), <strong>{globalStats.amarillas.sum ?? 0} tarjetas amarillas</strong> y <strong>{globalStats.rojas.sum ?? 0} expulsiones</strong>.
                 </p>
               </div>
 
-              <div className="bg-blue-50 p-5 rounded-lg border border-blue-200">
-                <h3 className="font-bold text-brand-dark text-lg mb-2">2. Rendimiento por Jerarquía del Rival (Top 10 vs. Top 20 vs. &gt;20)</h3>
-                <ul className="list-disc pl-5 space-y-2">
+              {/* SECCIÓN 2: CORRELACIÓN RENDIMIENTO + ESTADÍSTICAS POR RANKING FIFA */}
+              <div className="bg-blue-50 p-5 rounded-lg border border-blue-200 space-y-3">
+                <h3 className="font-bold text-brand-dark text-lg">
+                  2. Correlación Resultados vs. Estadísticas según Nivel del Rival (Ranking FIFA)
+                </h3>
+                <ul className="list-disc pl-5 space-y-2.5">
                   <li>
-                    <strong>Contra rivales fuera del Top 20 (&gt;20) — Dominio Consolidado ({fueraTop20.rendimiento}%):</strong> En {fueraTop20.total} partidos disputados, Colombia suma {fueraTop20.ganados} victorias, {fueraTop20.empatados} empates y solo {fueraTop20.perdidos} derrotas ({fueraTop20.puntos} de {fueraTop20.posibles} puntos). Demuestra solvencia táctica frente a selecciones de media y baja tabla.
+                    <strong>Rivales fuera del Top 20 (&gt;20) — Dominio de Marcador ({fueraTop20.rendimiento}%) y Control de Balón:</strong> En {fueraTop20.total} partidos ({fueraTop20.ganados}G - {fueraTop20.empatados}E - {fueraTop20.perdidos}P; {fueraTop20.golesFavor} GF / {fueraTop20.golesContra} GC), Colombia impone condiciones desde la tenencia con <strong>{fueraTop20Stats.posesion.avg ? `${fueraTop20Stats.posesion.avg.toFixed(1)}%` : 'N/D'} de posesión</strong>, <strong>{fueraTop20Stats.pases.avg ? Math.round(fueraTop20Stats.pases.avg) : 'N/D'} pases/PJ</strong> al <strong>{fueraTop20Stats.precisionPases.avg ? `${fueraTop20Stats.precisionPases.avg.toFixed(1)}%` : 'N/D'} de precisión</strong> y una producción ofensiva de <strong>{fueraTop20Stats.remates.avg ? fueraTop20Stats.remates.avg.toFixed(1) : 'N/D'} remates/PJ</strong> ({fueraTop20Stats.rematesArco.avg ? fueraTop20Stats.rematesArco.avg.toFixed(1) : 'N/D'} al arco), cometiendo apenas <strong>{fueraTop20Stats.faltas.avg ? fueraTop20Stats.faltas.avg.toFixed(1) : 'N/D'} faltas/PJ</strong>.
                   </li>
                   <li>
-                    <strong>Contra rivales del Top 11 al 20 — Paridad Competitiva ({top11a20.rendimiento}%):</strong> Al aislar los {top11a20.total} enfrentamientos frente a pares directos ubicados entre los puestos 11 y 20, Colombia registra {top11a20.ganados} victorias, {top11a20.empatados} empates y {top11a20.perdidos} derrotas, ratificando su competitividad en su misma franja FIFA.
+                    <strong>Rivales del Top 11 al 20 — Paridad Competitiva ({top11a20.rendimiento}%) y Equilibrio Estadístico:</strong> En {top11a20.total} enfrentamientos ante selecciones de su misma franja FIFA ({top11a20.ganados}G - {top11a20.empatados}E - {top11a20.perdidos}P; {top11a20.golesFavor} GF / {top11a20.golesContra} GC), el combinado nacional sostiene un <strong>{top11a20Stats.posesion.avg ? `${top11a20Stats.posesion.avg.toFixed(1)}%` : 'N/D'} de posesión</strong> y eleva su volumen ofensivo a <strong>{top11a20Stats.remates.avg ? top11a20Stats.remates.avg.toFixed(1) : 'N/D'} remates/PJ</strong> ({top11a20Stats.rematesArco.avg ? top11a20Stats.rematesArco.avg.toFixed(1) : 'N/D'} al arco), confirmando capacidad para disputar de igual a igual la iniciativa del juego.
                   </li>
                   <li>
-                    <strong>Contra rivales del Top 10 (1 al 10) — Brecha Crítica de Élite ({top10.rendimiento}%):</strong> Frente a las potencias consolidadas (EE. UU., Brasil, Japón, España, Francia, Canadá), el rendimiento cae al <strong>{top10.rendimiento}%</strong> ({top10.ganados}G, {top10.empatados}E, {top10.perdidos}P en {top10.total} partidos), concentrando la gran mayoría de las derrotas históricas del ciclo.
+                    <strong>Rivales del Top 10 (1 al 10) — Brecha Competitiva ({top10.rendimiento}%) y Exigencia Defensiva:</strong> Frente a la élite mundial ({top10.total} PJ: {top10.ganados}G - {top10.empatados}E - {top10.perdidos}P; {top10.golesFavor} GF / {top10.golesContra} GC), la posesión desciende al <strong>{top10Stats.posesion.avg ? `${top10Stats.posesion.avg.toFixed(1)}%` : 'N/D'}</strong>
+                    {analisisDinamico.brechaPosesionTop10 ? ` (${analisisDinamico.brechaPosesionTop10} puntos porcentuales menos que ante rivales >20)` : ''}, con <strong>{top10Stats.pases.avg ? Math.round(top10Stats.pases.avg) : 'N/D'} pases/PJ</strong> ({top10Stats.precisionPases.avg ? `${top10Stats.precisionPases.avg.toFixed(1)}%` : 'N/D'} precisión) y <strong>{top10Stats.remates.avg ? top10Stats.remates.avg.toFixed(1) : 'N/D'} remates/PJ</strong> ({top10Stats.rematesArco.avg ? top10Stats.rematesArco.avg.toFixed(1) : 'N/D'} al arco). El mayor desgaste sin balón se refleja en el incremento de faltas (<strong>{top10Stats.faltas.avg ? top10Stats.faltas.avg.toFixed(1) : 'N/D'}/PJ</strong>) y amonestaciones (<strong>{top10Stats.amarillas.sum ?? 0} amarillas</strong> y <strong>{top10Stats.rojas.sum ?? 0} rojas</strong>).
                   </li>
                 </ul>
               </div>
 
+              {/* SECCIÓN 3: COMPARATIVA POR CONFEDERACIÓN (RESULTADOS + MÉTRICAS CLAVE) */}
               <div className="bg-indigo-50/60 p-5 rounded-lg border border-indigo-200">
-                <h3 className="font-bold text-brand-light text-lg mb-2">3. Comparativa Intercontinental por Confederaciones</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                <h3 className="font-bold text-brand-light text-lg mb-3">
+                  3. Comparativa Intercontinental por Confederaciones (Resultados y Estadísticas)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {confederacionesStats.map(c => (
-                    <div key={c.nombre} className="bg-white p-3 rounded border border-indigo-100 flex justify-between items-center">
-                      <div>
-                        <span className="font-bold text-gray-800">{c.nombre}</span>
-                        <span className="text-xs text-gray-500 block">{c.total} PJ ({c.ganados}G - {c.empatados}E - {c.perdidos}P)</span>
+                    <div key={c.nombre} className="bg-white p-3.5 rounded-lg border border-indigo-100 shadow-sm flex flex-col justify-between">
+                      <div className="flex justify-between items-start border-b border-gray-100 pb-2">
+                        <div>
+                          <span className="font-bold text-gray-800 text-base">{c.nombre}</span>
+                          <span className="text-xs text-gray-500 block">
+                            {c.total} PJ ({c.ganados}G - {c.empatados}E - {c.perdidos}P) · Goles: {c.golesFavor}:{c.golesContra}
+                          </span>
+                        </div>
+                        <span className="font-bold text-brand-dark text-lg">{c.rendimiento}%</span>
                       </div>
-                      <span className="font-bold text-brand-dark text-lg">{c.rendimiento}%</span>
+                      <div className="grid grid-cols-3 gap-1 pt-2 text-center text-[11px]">
+                        <div className="bg-slate-50 p-1.5 rounded">
+                          <span className="text-gray-400 block">Posesión</span>
+                          <strong className="text-brand-light">
+                            {c.stats.posesion.avg ? `${c.stats.posesion.avg.toFixed(1)}%` : '—'}
+                          </strong>
+                        </div>
+                        <div className="bg-slate-50 p-1.5 rounded">
+                          <span className="text-gray-400 block">Prec. Pases</span>
+                          <strong className="text-green-700">
+                            {c.stats.precisionPases.avg ? `${c.stats.precisionPases.avg.toFixed(1)}%` : '—'}
+                          </strong>
+                        </div>
+                        <div className="bg-slate-50 p-1.5 rounded">
+                          <span className="text-gray-400 block">Rem / Arco</span>
+                          <strong className="text-gray-800">
+                            {c.stats.remates.avg ? `${c.stats.remates.avg.toFixed(1)} / ${c.stats.rematesArco.avg.toFixed(1)}` : '—'}
+                          </strong>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="bg-red-50 p-5 rounded-lg border border-red-200">
-                <h3 className="font-bold text-red-800 text-lg mb-2">4. Conclusión Estratégica</h3>
+              {/* SECCIÓN 4: CONCLUSIONES ESTRATÉGICAS DINÁMICAS */}
+              <div className="bg-red-50 p-5 rounded-lg border border-red-200 space-y-2">
+                <h3 className="font-bold text-red-800 text-lg">
+                  4. Conclusiones Estratégicas para el Cuerpo Técnico
+                </h3>
                 <p className="text-gray-800">
-                  La Selección Colombia respalda plenamente su ubicación dentro del Top 20 mundial gracias a su hegemonía frente a rivales ubicados por debajo del puesto 20 (<strong>{fueraTop20.rendimiento}%</strong>) y su liderazgo sudamericano. Para dar el salto definitivo hacia el Top 10 global y competir por instancias decisivas en torneos orbitales, la planificación deportiva debe enfocarse en cerrar la brecha frente a las selecciones élite de Top 10, UEFA y Concacaf.
+                  • <strong>Brecha de Rendimiento y Tenencia:</strong> Existe una diferencia de <strong>{analisisDinamico.brechaPuntosTop10} puntos porcentuales</strong> de rendimiento entre enfrentar selecciones fuera del Top 20 (<strong>{fueraTop20.rendimiento}%</strong>) y rivales del Top 10 (<strong>{top10.rendimiento}%</strong>). Los datos estadísticos confirman que cuando Colombia supera el 50% de posesión y mantiene una precisión de pase superior al 78%, su probabilidad de victoria se incrementa de forma determinante.
+                </p>
+                {analisisDinamico.conmebolStat && (
+                  <p className="text-gray-800">
+                    • <strong>Solidez Sudamericana (CONMEBOL):</strong> En el ámbito continental, Colombia registra un <strong>{analisisDinamico.conmebolStat.rendimiento}%</strong> de efectividad ({analisisDinamico.conmebolStat.ganados}G - {analisisDinamico.conmebolStat.empatados}E - {analisisDinamico.conmebolStat.perdidos}P)
+                    {analisisDinamico.conmebolStat.stats.precisionPases.avg ? ` respaldado por un ${analisisDinamico.conmebolStat.stats.precisionPases.avg.toFixed(1)}% de precisión en el pase` : ''}, consolidando su jerarquía regional.
+                  </p>
+                )}
+                <p className="text-gray-800">
+                  • <strong>Foco de Optimización Táctica:</strong> Para escalar hacia el Top 10 mundial, el plan de trabajo debe priorizar la eficacia en transiciones ofensivas bajo presión alta (elevando el promedio actual de <strong>{top10Stats.rematesArco.avg ? top10Stats.rematesArco.avg.toFixed(1) : 'N/D'} remates al arco/PJ</strong> ante potencias) y el control disciplinario en partidos de alta exigencia física.
                 </p>
               </div>
             </div>
@@ -2324,7 +2571,190 @@ export default function App() {
         )}
 
         {/* ========================================================== */}
-        {/* TAB 4: FORMULARIO PROTEGIDO                                */}
+        {/* TAB 4: CUERPO TÉCNICO (4 INTEGRANTES CON RESEÑA EDITABLE)  */}
+        {/* ========================================================== */}
+        {activeTab === 'cuerpo_tecnico' && (
+          <div className="space-y-6">
+            {/* ENCABEZADO DE SECCIÓN */}
+            <div className="bg-white p-6 rounded-lg shadow border-t-4 border-brand-dark flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-brand-dark flex items-center space-x-2">
+                  <Award size={24} className="text-brand-light" />
+                  <span>Cuerpo Técnico — Selección Colombia Femenina Mayores</span>
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Estructura técnica, roles metodológicos y reseña profesional de cada integrante.
+                </p>
+              </div>
+
+              {!editingStaff ? (
+                <button
+                  type="button"
+                  onClick={iniciarEdicionStaff}
+                  className="self-start sm:self-center bg-brand-light text-white text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-brand-dark transition flex items-center space-x-2 shadow-sm"
+                >
+                  <Edit3 size={15} />
+                  <span>Editar Reseñas</span>
+                </button>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingStaff(false)}
+                    className="bg-gray-200 text-gray-700 text-xs font-bold px-3.5 py-2.5 rounded-lg hover:bg-gray-300 transition flex items-center space-x-1"
+                  >
+                    <X size={15} />
+                    <span>Cancelar</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* MODAL / CAJA DE PIN PARA EDITAR CUERPO TÉCNICO SI NO ESTÁ AUTENTICADO */}
+            {showStaffPinModal && !isAdmin && (
+              <div className="bg-white p-6 rounded-lg shadow-md border-t-4 border-red-600 max-w-md mx-auto text-center">
+                <ShieldAlert className="mx-auto text-red-600 mb-3" size={40} />
+                <h3 className="text-lg font-bold text-gray-800">Autenticación Requerida</h3>
+                <p className="text-xs text-gray-600 mt-1 mb-4">
+                  Ingresa el PIN de administrador para editar las reseñas del Cuerpo Técnico.
+                </p>
+                <form onSubmit={verificarPin} className="space-y-3">
+                  <input
+                    type="password"
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value)}
+                    placeholder="PIN (ej. 2026)"
+                    className="w-full p-2.5 border rounded text-center text-base tracking-widest focus:ring-2 focus:ring-red-500 outline-none"
+                  />
+                  {pinError && <p className="text-red-500 text-xs">PIN incorrecto.</p>}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowStaffPinModal(false)}
+                      className="w-1/2 bg-gray-200 text-gray-700 font-bold py-2.5 rounded text-sm hover:bg-gray-300"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="w-1/2 bg-red-600 text-white font-bold py-2.5 rounded text-sm hover:bg-red-700"
+                    >
+                      Desbloquear
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* VISTA DE LECTURA O FORMULARIO DE EDICIÓN DE LOS 4 INTEGRANTES */}
+            {!editingStaff ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {cuerpoTecnico.map((miembro, idx) => {
+                  const initials = miembro.nombre
+                    .split(' ')
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map(n => n[0]?.toUpperCase())
+                    .join('') || 'CT';
+                  return (
+                    <div
+                      key={miembro.id}
+                      className={`bg-white rounded-lg shadow-md overflow-hidden border-t-4 flex flex-col justify-between ${
+                        idx === 0 ? 'border-brand-dark' : 'border-brand-light'
+                      }`}
+                    >
+                      <div className="p-6">
+                        <div className="flex items-center space-x-4 mb-4">
+                          <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-lg shrink-0 shadow ${
+                            idx === 0 ? 'bg-brand-dark' : 'bg-brand-light'
+                          }`}>
+                            {initials}
+                          </div>
+                          <div>
+                            <span className="inline-block text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-50 text-brand-dark border border-blue-200">
+                              {miembro.cargo}
+                            </span>
+                            <h3 className="text-xl font-bold text-gray-900 mt-1">{miembro.nombre}</h3>
+                            {miembro.especialidad && (
+                              <p className="text-xs text-brand-light font-medium mt-0.5">{miembro.especialidad}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                          <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Breve Reseña</p>
+                          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                            {miembro.resena}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <form onSubmit={guardarCuerpoTecnico} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {staffDraft.map((miembro) => (
+                    <div key={miembro.id} className="bg-white p-6 rounded-lg shadow-md border-t-4 border-brand-light space-y-3">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <span className="text-sm font-bold uppercase tracking-wider text-brand-dark">
+                          {miembro.cargo}
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Nombre Completo *</label>
+                        <input
+                          required
+                          type="text"
+                          value={miembro.nombre}
+                          onChange={(e) => handleStaffFieldChange(miembro.id, 'nombre', e.target.value)}
+                          className="w-full p-2.5 border rounded mt-1 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Especialidad / Licencia / Área</label>
+                        <input
+                          type="text"
+                          value={miembro.especialidad}
+                          onChange={(e) => handleStaffFieldChange(miembro.id, 'especialidad', e.target.value)}
+                          className="w-full p-2.5 border rounded mt-1 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700">Breve Reseña Profesional *</label>
+                        <textarea
+                          required
+                          rows={4}
+                          value={miembro.resena}
+                          onChange={(e) => handleStaffFieldChange(miembro.id, 'resena', e.target.value)}
+                          className="w-full p-2.5 border rounded mt-1 text-sm leading-relaxed"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingStaff}
+                    className="bg-brand-dark text-white font-bold px-6 py-3 rounded-lg hover:bg-brand-light transition flex items-center space-x-2 shadow disabled:opacity-50"
+                  >
+                    <Save size={18} />
+                    <span>{savingStaff ? 'Guardando en Firebase...' : 'Guardar Reseñas del Cuerpo Técnico'}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================== */}
+        {/* TAB 5: FORMULARIO PROTEGIDO                                */}
         {/* ========================================================== */}
         {activeTab === 'formulario' && (
           <div className="max-w-3xl mx-auto space-y-6">
