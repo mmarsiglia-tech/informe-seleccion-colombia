@@ -18,7 +18,11 @@ import {
   Award,
   Edit3,
   Save,
-  X
+  X,
+  Download,
+  Smartphone,
+  FileSpreadsheet,
+  Search
 } from 'lucide-react';
 
 // CONFIGURACIÓN DE FIREBASE CONECTADA
@@ -1294,10 +1298,53 @@ const defaultCuerpoTecnico = [
   }
 ];
 
+const emptyMatchForm = {
+  rival: '',
+  ranking: '',
+  confederacion: 'Conmebol',
+  golesCol: '',
+  golesRiv: '',
+  fecha: '',
+  tipo: 'Fecha Fifa',
+  remates: '',
+  rematesArco: '',
+  posesion: '',
+  pases: '',
+  precisionPases: '',
+  faltas: '',
+  amarillas: '',
+  rojas: '',
+  tirosEsquina: '',
+  fueraLugar: ''
+};
+
+// Cargador dinámico de SheetJS para exportar .xlsx sin dependencias externas en build
+const loadSheetJS = () => {
+  return new Promise((resolve, reject) => {
+    if (window.XLSX) {
+      resolve(window.XLSX);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    script.async = true;
+    script.onload = () => resolve(window.XLSX);
+    script.onerror = () => reject(new Error('No se pudo cargar el generador Excel'));
+    document.head.appendChild(script);
+  });
+};
+
 export default function App() {
   const [firestorePartidos, setFirestorePartidos] = useState([]);
   const [activeTab, setActiveTab] = useState('rendimiento');
   const [syncing, setSyncing] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
+
+  // Estados PWA (Instalación en celular)
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [showIOSInstallModal, setShowIOSInstallModal] = useState(false);
 
   // Estado para Cuerpo Técnico (sincronizado con Firebase)
   const [cuerpoTecnico, setCuerpoTecnico] = useState(defaultCuerpoTecnico);
@@ -1322,26 +1369,54 @@ export default function App() {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
 
-  // Formulario de nuevos partidos
-  const [formData, setFormData] = useState({
-    rival: '',
-    ranking: '',
-    confederacion: 'Conmebol',
-    golesCol: '',
-    golesRiv: '',
-    fecha: '',
-    tipo: 'Fecha Fifa',
-    remates: '',
-    rematesArco: '',
-    posesion: '',
-    pases: '',
-    precisionPases: '',
-    faltas: '',
-    amarillas: '',
-    rojas: '',
-    tirosEsquina: '',
-    fueraLugar: ''
-  });
+  // Formulario de creación / edición de partidos
+  const [formData, setFormData] = useState(emptyMatchForm);
+  const [editingMatch, setEditingMatch] = useState(null);
+  const [matchSearch, setMatchSearch] = useState('');
+  const [matchFilter, setMatchFilter] = useState('todos'); // 'todos' | 'nuevos'
+
+  // Detectar soporte de instalación PWA en Android/Chrome e iOS Safari
+  useEffect(() => {
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+    setIsInstalled(standalone);
+
+    const ua = window.navigator.userAgent || '';
+    const iosDevice = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    setIsIOS(iosDevice);
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else if (isIOS) {
+      setShowIOSInstallModal(true);
+    } else {
+      setShowIOSInstallModal(true);
+    }
+  };
 
   // Lectura en tiempo real de partidos desde Firestore
   useEffect(() => {
@@ -1541,6 +1616,155 @@ export default function App() {
     };
   }, [global, top10, fueraTop20, top10Stats, fueraTop20Stats, confederacionesStats]);
 
+  // --- Exportación completa a Excel (.xlsx) desde celular o computador ---
+  const exportarExcelCompleto = async () => {
+    setExportingExcel(true);
+    try {
+      const XLSX = await loadSheetJS();
+      const wb = XLSX.utils.book_new();
+
+      // Hoja 1: Base Completa de Partidos (ordenada cronológicamente)
+      const partidosOrdenados = [...partidos].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+      const hojaPartidos = partidosOrdenados.map((p, i) => ({
+        '#': p.numero || i + 1,
+        'Fecha': p.fecha || '',
+        'Rival': p.rival || '',
+        'Confederación': p.confederacion || '',
+        'Ranking FIFA': Number(p.ranking) || '',
+        'Goles Colombia': Number(p.golesCol) ?? 0,
+        'Goles Rival': Number(p.golesRiv) ?? 0,
+        'Resultado': p.resultado || '',
+        'Competencia': p.tipo || '',
+        'Remates': p.remates ?? '',
+        'Remates al Arco': p.rematesArco ?? '',
+        'Posesión (%)': p.posesion ?? '',
+        'Pases Totales': p.pases ?? '',
+        'Precisión Pases (%)': p.precisionPases ?? '',
+        'Faltas': p.faltas ?? '',
+        'Amarillas': p.amarillas ?? '',
+        'Rojas': p.rojas ?? '',
+        'Tiros de Esquina': p.tirosEsquina ?? '',
+        'Fuera de Lugar': p.fueraLugar ?? ''
+      }));
+      const wsPartidos = XLSX.utils.json_to_sheet(hojaPartidos);
+      wsPartidos['!cols'] = [
+        { wch: 5 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 13 },
+        { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 10 },
+        { wch: 15 }, { wch: 13 }, { wch: 13 }, { wch: 18 }, { wch: 9 },
+        { wch: 10 }, { wch: 8 }, { wch: 16 }, { wch: 14 }
+      ];
+      XLSX.utils.book_append_sheet(wb, wsPartidos, 'Partidos');
+
+      // Hoja 2: Rendimiento (Ranking FIFA, Confederaciones y Rivales)
+      const filasRendimiento = [
+        ['1. RENDIMIENTO GENERAL Y POR RANKING FIFA'],
+        ['Categoría Ranking FIFA', 'PJ', 'Ganados', 'Empatados', 'Perdidos', 'GF', 'GC', 'DG', 'Pts Obtenidos', 'Pts Posibles', 'Rendimiento (%)'],
+        ...[
+          { label: 'Total General', st: global },
+          { label: 'Rivales Top 10 (1 al 10)', st: top10 },
+          { label: 'Rivales del 11 al 20', st: top11a20 },
+          { label: 'Rivales Top 20 (1 al 20)', st: top20 },
+          { label: 'Rivales Fuera del Top 20 (>20)', st: fueraTop20 }
+        ].map(r => [
+          r.label, r.st.total, r.st.ganados, r.st.empatados, r.st.perdidos,
+          r.st.golesFavor, r.st.golesContra, r.st.diferenciaGoles,
+          r.st.puntos, r.st.posibles, Number(r.st.rendimiento)
+        ]),
+        [],
+        ['2. RENDIMIENTO POR CONFEDERACIÓN DEL RIVAL'],
+        ['Confederación', 'PJ', 'Ganados', 'Empatados', 'Perdidos', 'GF', 'GC', 'DG', 'Pts Obtenidos', 'Pts Posibles', 'Rendimiento (%)'],
+        ...confederacionesStats.map(c => [
+          c.nombre, c.total, c.ganados, c.empatados, c.perdidos,
+          c.golesFavor, c.golesContra, c.diferenciaGoles,
+          c.puntos, c.posibles, Number(c.rendimiento)
+        ]),
+        [],
+        ['3. RENDIMIENTO POR RIVAL (MAYOR A MENOR PARTIDOS)'],
+        ['Rival', 'Confederación', 'Ranking FIFA', 'PJ', 'G', 'E', 'P', 'GF', 'GC', 'Pts Obt.', 'Pts Pos.', 'Rendimiento (%)'],
+        ...rivalesStats.map(r => [
+          r.rival, r.confederacion, r.ranking, r.total, r.ganados, r.empatados, r.perdidos,
+          r.golesFavor, r.golesContra, r.puntos, r.posibles, Number(r.rendimiento)
+        ])
+      ];
+      const wsRendimiento = XLSX.utils.aoa_to_sheet(filasRendimiento);
+      wsRendimiento['!cols'] = [
+        { wch: 30 }, { wch: 14 }, { wch: 13 }, { wch: 10 }, { wch: 10 },
+        { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 13 }, { wch: 16 }, { wch: 16 }
+      ];
+      XLSX.utils.book_append_sheet(wb, wsRendimiento, 'Rendimiento');
+
+      // Hoja 3: Estadísticas de Juego (Totales y Promedios)
+      const fmtVal = (obj, isAvg = false) => (obj && obj.count > 0 ? Number((isAvg ? obj.avg : obj.sum).toFixed(2)) : 'N/D');
+      const fmtPct = (obj) => (obj && obj.count > 0 ? Number(obj.avg.toFixed(2)) : 'N/D');
+      const mapStatsRow = (label, st, isAvg = false) => [
+        label,
+        st.total,
+        fmtVal(st.remates, isAvg),
+        fmtVal(st.rematesArco, isAvg),
+        fmtPct(st.posesion),
+        fmtVal(st.pases, isAvg),
+        fmtPct(st.precisionPases),
+        fmtVal(st.faltas, isAvg),
+        fmtVal(st.amarillas, isAvg),
+        fmtVal(st.rojas, isAvg),
+        fmtVal(st.tirosEsquina, isAvg),
+        fmtVal(st.fueraLugar, isAvg)
+      ];
+
+      const filasEstadisticas = [
+        ['1. ESTADÍSTICAS GENERALES Y POR RANKING FIFA (TOTALES ACUMULADOS Y PROMEDIOS %)'],
+        ['Categoría', 'PJ', 'Remates', 'Rem. Arco', 'Posesión (%)', 'Pases', 'Prec. Pases (%)', 'Faltas', 'Amarillas', 'Rojas', 'T. Esquina', 'Fuera Lugar'],
+        mapStatsRow('Total General (Acumulado)', globalStats, false),
+        mapStatsRow('Total General (Promedio/PJ)', globalStats, true),
+        mapStatsRow('Rivales Top 10 (Acumulado)', top10Stats, false),
+        mapStatsRow('Rivales del 11 al 20 (Acumulado)', top11a20Stats, false),
+        mapStatsRow('Rivales Top 20 (Acumulado)', top20Stats, false),
+        mapStatsRow('Rivales Fuera Top 20 (Acumulado)', fueraTop20Stats, false),
+        [],
+        ['2. ESTADÍSTICAS POR CONFEDERACIÓN DEL RIVAL'],
+        ['Confederación', 'PJ', 'Remates', 'Rem. Arco', 'Posesión (%)', 'Pases', 'Prec. Pases (%)', 'Faltas', 'Amarillas', 'Rojas', 'T. Esquina', 'Fuera Lugar'],
+        ...confederacionesStats.map(c => mapStatsRow(c.nombre, c.stats, false)),
+        [],
+        ['3. ESTADÍSTICAS POR RIVAL (TOTALES ACUMULADOS)'],
+        ['Rival', 'PJ', 'Remates', 'Rem. Arco', 'Posesión (%)', 'Pases', 'Prec. Pases (%)', 'Faltas', 'Amarillas', 'Rojas', 'T. Esquina', 'Fuera Lugar'],
+        ...rivalesStats.map(r => mapStatsRow(`${r.rival} (#${r.ranking})`, r.stats, false))
+      ];
+      const wsStats = XLSX.utils.aoa_to_sheet(filasEstadisticas);
+      wsStats['!cols'] = [
+        { wch: 32 }, { wch: 7 }, { wch: 11 }, { wch: 11 }, { wch: 13 }, { wch: 11 },
+        { wch: 15 }, { wch: 9 }, { wch: 11 }, { wch: 8 }, { wch: 12 }, { wch: 12 }
+      ];
+      XLSX.utils.book_append_sheet(wb, wsStats, 'Estadisticas');
+
+      // Hoja 4: Análisis Ejecutivo y Cuerpo Técnico
+      const filasAnalisis = [
+        ['SELECCIÓN COLOMBIA FEMENINA MAYORES - CUERPO TÉCNICO ANGELO MARSIGLIA'],
+        ['Fecha de generación', new Date().toLocaleDateString('es-CO')],
+        ['Total partidos analizados', global.total],
+        ['Rendimiento global (%)', Number(global.rendimiento)],
+        ['Balance', `${global.ganados}G - ${global.empatados}E - ${global.perdidos}P (GF: ${global.golesFavor} / GC: ${global.golesContra})`],
+        ['Posesión promedio (%)', globalStats.posesion.avg ? Number(globalStats.posesion.avg.toFixed(2)) : 'N/D'],
+        ['Precisión pases promedio (%)', globalStats.precisionPases.avg ? Number(globalStats.precisionPases.avg.toFixed(2)) : 'N/D'],
+        ['Remates / Al arco promedio por partido', globalStats.remates.avg ? `${globalStats.remates.avg.toFixed(1)} / ${globalStats.rematesArco.avg.toFixed(1)}` : 'N/D'],
+        [],
+        ['CUERPO TÉCNICO'],
+        ['Cargo', 'Nombre', 'Especialidad', 'Reseña'],
+        ...cuerpoTecnico.map(m => [m.cargo, m.nombre, m.especialidad, m.resena])
+      ];
+      const wsAnalisis = XLSX.utils.aoa_to_sheet(filasAnalisis);
+      wsAnalisis['!cols'] = [{ wch: 24 }, { wch: 26 }, { wch: 36 }, { wch: 70 }];
+      XLSX.utils.book_append_sheet(wb, wsAnalisis, 'Analisis_y_CT');
+
+      const fechaArchivo = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Seleccion_Colombia_Femenina_Mayores_${fechaArchivo}.xlsx`);
+    } catch (err) {
+      console.error('Error exportando Excel:', err);
+      alert('No se pudo generar el archivo .xlsx. Verifica tu conexión a internet e inténtalo nuevamente.');
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   // --- Lógica de Administrador ---
   const verificarPin = (e) => {
     e.preventDefault();
@@ -1612,6 +1836,36 @@ export default function App() {
     }
   };
 
+  // Cargar un partido existente en el formulario para editarlo
+  const iniciarEdicionPartido = (p) => {
+    setEditingMatch(p);
+    setFormData({
+      rival: p.rival || '',
+      ranking: p.ranking !== null && p.ranking !== undefined ? String(p.ranking) : '',
+      confederacion: p.confederacion || 'Conmebol',
+      golesCol: p.golesCol !== null && p.golesCol !== undefined ? String(p.golesCol) : '',
+      golesRiv: p.golesRiv !== null && p.golesRiv !== undefined ? String(p.golesRiv) : '',
+      fecha: p.fecha || '',
+      tipo: p.tipo || 'Fecha Fifa',
+      remates: p.remates !== null && p.remates !== undefined ? String(p.remates) : '',
+      rematesArco: p.rematesArco !== null && p.rematesArco !== undefined ? String(p.rematesArco) : '',
+      posesion: p.posesion !== null && p.posesion !== undefined ? String(p.posesion) : '',
+      pases: p.pases !== null && p.pases !== undefined ? String(p.pases) : '',
+      precisionPases: p.precisionPases !== null && p.precisionPases !== undefined ? String(p.precisionPases) : '',
+      faltas: p.faltas !== null && p.faltas !== undefined ? String(p.faltas) : '',
+      amarillas: p.amarillas !== null && p.amarillas !== undefined ? String(p.amarillas) : '',
+      rojas: p.rojas !== null && p.rojas !== undefined ? String(p.rojas) : '',
+      tirosEsquina: p.tirosEsquina !== null && p.tirosEsquina !== undefined ? String(p.tirosEsquina) : '',
+      fueraLugar: p.fueraLugar !== null && p.fueraLugar !== undefined ? String(p.fueraLugar) : ''
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelarEdicionPartido = () => {
+    setEditingMatch(null);
+    setFormData(emptyMatchForm);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const gc = parseInt(formData.golesCol);
@@ -1621,7 +1875,7 @@ export default function App() {
     const parseOptInt = (v) => (v === '' || v === null || v === undefined ? null : parseInt(v));
     const parseOptFloat = (v) => (v === '' || v === null || v === undefined ? null : parseFloat(v));
 
-    const nuevoPartido = {
+    const payloadPartido = {
       rival: formData.rival.trim(),
       ranking: parseInt(formData.ranking),
       confederacion: formData.confederacion,
@@ -1640,31 +1894,21 @@ export default function App() {
       rojas: parseOptInt(formData.rojas),
       tirosEsquina: parseOptInt(formData.tirosEsquina),
       fueraLugar: parseOptInt(formData.fueraLugar),
-      esHistorico: false
+      esHistorico: editingMatch ? Boolean(editingMatch.esHistorico) : false,
+      ...(editingMatch && editingMatch.numero ? { numero: editingMatch.numero } : {})
     };
 
     try {
-      await addDoc(collection(db, "partidos"), nuevoPartido);
-      setFormData({
-        rival: '',
-        ranking: '',
-        confederacion: 'Conmebol',
-        golesCol: '',
-        golesRiv: '',
-        fecha: '',
-        tipo: 'Fecha Fifa',
-        remates: '',
-        rematesArco: '',
-        posesion: '',
-        pases: '',
-        precisionPases: '',
-        faltas: '',
-        amarillas: '',
-        rojas: '',
-        tirosEsquina: '',
-        fueraLugar: ''
-      });
-      alert("Partido registrado con éxito. Las secciones de Rendimiento, Estadísticas y Análisis se han actualizado.");
+      if (editingMatch) {
+        await setDoc(doc(db, "partidos", editingMatch.id), payloadPartido, { merge: true });
+        setEditingMatch(null);
+        setFormData(emptyMatchForm);
+        alert("Partido actualizado con éxito en tiempo real.");
+      } else {
+        await addDoc(collection(db, "partidos"), payloadPartido);
+        setFormData(emptyMatchForm);
+        alert("Partido registrado con éxito. Las secciones de Rendimiento, Estadísticas y Análisis se han actualizado.");
+      }
     } catch (error) {
       console.error(error);
       alert("Error al guardar: verifica que las Reglas de Firestore estén publicadas con allow read, write: if true;");
@@ -1672,15 +1916,30 @@ export default function App() {
   };
 
   const eliminarPartido = async (id) => {
-    if (!window.confirm("¿Deseas eliminar este partido?")) return;
+    if (!window.confirm("¿Deseas eliminar este partido de Firebase?")) return;
     try {
       await deleteDoc(doc(db, "partidos", id));
+      if (editingMatch && editingMatch.id === id) {
+        cancelEdicionPartido();
+      }
     } catch (error) {
       alert("Error al eliminar el registro.");
     }
   };
 
-  const nuevosPartidosFirebase = firestorePartidos.filter(p => !p.esHistorico);
+  const partidosFiltradosAdmin = useMemo(() => {
+    return partidos.filter(p => {
+      if (matchFilter === 'nuevos' && p.esHistorico) return false;
+      if (!matchSearch.trim()) return true;
+      const q = matchSearch.toLowerCase();
+      return (
+        (p.rival || '').toLowerCase().includes(q) ||
+        (p.tipo || '').toLowerCase().includes(q) ||
+        (p.fecha || '').includes(q) ||
+        (p.confederacion || '').toLowerCase().includes(q)
+      );
+    });
+  }, [partidos, matchFilter, matchSearch]);
 
   // Formateadores para celdas de Estadísticas de Juego
   const fmtCountStat = (obj) => {
@@ -1739,95 +1998,185 @@ export default function App() {
     { key: 'fueraTop20', label: 'Rivales Fuera del Top 20 (> 20)', stat: fueraTop20Stats, expandable: true }
   ];
 
+  const navItems = [
+    { id: 'rendimiento', label: 'Rendimiento', shortLabel: 'Rendim.', icon: BarChart2 },
+    { id: 'estadisticas', label: 'Estadísticas', shortLabel: 'Estadíst.', icon: Activity },
+    { id: 'analisis', label: 'Análisis', shortLabel: 'Análisis', icon: FileText },
+    { id: 'cuerpo_tecnico', label: 'Cuerpo Técnico', shortLabel: 'C. Técnico', icon: Award },
+    { id: 'formulario', label: 'Registrar Datos', shortLabel: 'Registrar', icon: Settings, isAdminBtn: true }
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center pb-12">
-      {/* HEADER */}
-      <header className="w-full bg-brand-dark text-white p-6 shadow-md text-center">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-          Selección Colombia Femenina Mayores - Cuerpo Técnico Angelo Marsiglia
-        </h1>
-        <p className="text-sm mt-2 font-light text-blue-100">
-          Rendimiento, Estadísticas de Juego, Ranking FIFA y Análisis Gerencial ({partidos.length} Partidos Analizados)
-        </p>
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center pb-24 md:pb-12">
+      {/* HEADER CON ACCIONES MÓVILES (INSTALAR PWA + DESCARGAR EXCEL) */}
+      <header className="w-full bg-brand-dark text-white px-4 py-5 md:p-6 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="text-center md:text-left">
+            <h1 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight">
+              Selección Colombia Femenina Mayores - Cuerpo Técnico Angelo Marsiglia
+            </h1>
+            <p className="text-xs sm:text-sm mt-1 font-light text-blue-100">
+              Rendimiento, Estadísticas de Juego, Ranking FIFA y Análisis Gerencial ({partidos.length} Partidos Analizados)
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 shrink-0">
+            {!isInstalled && (
+              <button
+                type="button"
+                onClick={handleInstallApp}
+                className="bg-yellow-400 text-brand-dark hover:bg-yellow-300 font-bold text-xs px-3.5 py-2 rounded-lg shadow flex items-center space-x-1.5 transition"
+              >
+                <Smartphone size={16} />
+                <span>Instalar App</span>
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={exportingExcel}
+              onClick={exportarExcelCompleto}
+              className="bg-white/15 hover:bg-white/25 text-white border border-white/25 font-semibold text-xs px-3.5 py-2 rounded-lg flex items-center space-x-1.5 transition disabled:opacity-50"
+            >
+              <FileSpreadsheet size={16} />
+              <span>{exportingExcel ? 'Generando...' : 'Descargar Excel'}</span>
+            </button>
+          </div>
+        </div>
       </header>
 
-      {/* NAVEGACIÓN */}
-      <nav className="flex flex-wrap justify-center gap-2 md:space-x-2 mt-6 bg-white p-2 rounded-lg shadow">
-        <button
-          onClick={() => setActiveTab('rendimiento')}
-          className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'rendimiento' ? 'bg-brand-light text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-        >
-          <BarChart2 size={18} /> <span>Rendimiento</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('estadisticas')}
-          className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'estadisticas' ? 'bg-brand-light text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-        >
-          <Activity size={18} /> <span>Estadísticas</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('analisis')}
-          className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'analisis' ? 'bg-brand-light text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-        >
-          <FileText size={18} /> <span>Análisis</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('cuerpo_tecnico')}
-          className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'cuerpo_tecnico' ? 'bg-brand-light text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-        >
-          <Award size={18} /> <span>Cuerpo Técnico</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('formulario')}
-          className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${activeTab === 'formulario' ? 'bg-red-600 text-white' : 'text-red-600 border border-red-200 hover:bg-red-50'}`}
-        >
-          <Settings size={18} /> <span>Registrar Datos</span>
-        </button>
+      {/* MODAL INSTRUCCIONES INSTALACIÓN EN IPHONE / CELULAR */}
+      {showIOSInstallModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 border-t-4 border-brand-dark space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-lg text-brand-dark flex items-center gap-2">
+                <Smartphone size={20} />
+                <span>Instalar App en tu Celular</span>
+              </h3>
+              <button onClick={() => setShowIOSInstallModal(false)} className="text-gray-400 hover:text-gray-700">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="text-xs text-gray-700 space-y-3 leading-relaxed">
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                <p className="font-bold text-brand-dark mb-1">En iPhone / iPad (Safari):</p>
+                <p>1. Toca el ícono <strong>Compartir</strong> (cuadro con flecha hacia arriba en la barra inferior).</p>
+                <p>2. Desliza y selecciona <strong>"Agregar a pantalla de inicio"</strong>.</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <p className="font-bold text-gray-800 mb-1">En Android (Google Chrome):</p>
+                <p>1. Toca el menú de <strong>tres puntos (⋮)</strong> arriba a la derecha.</p>
+                <p>2. Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a pantalla principal"</strong>.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowIOSInstallModal(false)}
+              className="w-full bg-brand-dark text-white font-bold py-2.5 rounded-lg text-sm hover:bg-brand-light"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NAVEGACIÓN SUPERIOR (ESCRITORIO Y TABLET) */}
+      <nav className="hidden md:flex flex-wrap justify-center gap-2 mt-6 bg-white p-2 rounded-lg shadow">
+        {navItems.map(item => {
+          const IconComp = item.icon;
+          const active = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`px-4 py-2 rounded font-semibold flex items-center space-x-2 transition ${
+                item.isAdminBtn
+                  ? active
+                    ? 'bg-red-600 text-white'
+                    : 'text-red-600 border border-red-200 hover:bg-red-50'
+                  : active
+                  ? 'bg-brand-light text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <IconComp size={18} /> <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* BARRA DE NAVEGACIÓN INFERIOR FIJA PARA CELULAR (UX APP NATIVA) */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 shadow-lg grid grid-cols-5">
+        {navItems.map(item => {
+          const IconComp = item.icon;
+          const active = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`py-2.5 px-1 flex flex-col items-center justify-center gap-1 text-[10px] font-bold transition ${
+                item.isAdminBtn
+                  ? active
+                    ? 'bg-red-600 text-white'
+                    : 'text-red-600'
+                  : active
+                  ? 'text-brand-dark bg-blue-50/80 border-t-2 border-brand-dark'
+                  : 'text-gray-500'
+              }`}
+            >
+              <IconComp size={18} />
+              <span className="truncate max-w-full">{item.shortLabel}</span>
+            </button>
+          );
+        })}
       </nav>
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="w-full max-w-7xl mt-6 px-4">
+      <main className="w-full max-w-7xl mt-5 md:mt-6 px-3 sm:px-4">
 
         {/* ========================================================== */}
         {/* TAB 1: RENDIMIENTO                                         */}
         {/* ========================================================== */}
         {activeTab === 'rendimiento' && (
-          <div className="space-y-8">
+          <div className="space-y-6 md:space-y-8">
             {/* TARJETAS KPI */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-brand-dark">
-                <p className="text-xs text-gray-500 font-bold uppercase">Partidos Jugados</p>
-                <p className="text-3xl font-bold text-gray-800 mt-1">{global.total}</p>
-                <p className="text-xs text-gray-500 mt-1">{global.ganados}G · {global.empatados}E · {global.perdidos}P</p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className="bg-white p-4 md:p-5 shadow rounded-lg border-l-4 border-brand-dark">
+                <p className="text-[11px] md:text-xs text-gray-500 font-bold uppercase">Partidos Jugados</p>
+                <p className="text-2xl md:text-3xl font-bold text-gray-800 mt-1">{global.total}</p>
+                <p className="text-[11px] md:text-xs text-gray-500 mt-1">{global.ganados}G · {global.empatados}E · {global.perdidos}P</p>
               </div>
-              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-green-600">
-                <p className="text-xs text-gray-500 font-bold uppercase">Puntos Obtenidos</p>
-                <p className="text-3xl font-bold text-green-600 mt-1">{global.puntos} <span className="text-base font-normal text-gray-400">/ {global.posibles}</span></p>
-                <p className="text-xs text-gray-500 mt-1">3 pts victoria · 1 pt empate</p>
+              <div className="bg-white p-4 md:p-5 shadow rounded-lg border-l-4 border-green-600">
+                <p className="text-[11px] md:text-xs text-gray-500 font-bold uppercase">Puntos Obtenidos</p>
+                <p className="text-2xl md:text-3xl font-bold text-green-600 mt-1">{global.puntos} <span className="text-sm md:text-base font-normal text-gray-400">/ {global.posibles}</span></p>
+                <p className="text-[11px] md:text-xs text-gray-500 mt-1">3 pts victoria · 1 pt empate</p>
               </div>
-              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-brand-light">
-                <p className="text-xs text-gray-500 font-bold uppercase">Rendimiento Global</p>
-                <p className="text-3xl font-bold text-brand-light mt-1">{global.rendimiento}%</p>
-                <p className="text-xs text-gray-500 mt-1">Fuera Top 20: <strong className="text-green-600">{fueraTop20.rendimiento}%</strong></p>
+              <div className="bg-white p-4 md:p-5 shadow rounded-lg border-l-4 border-brand-light">
+                <p className="text-[11px] md:text-xs text-gray-500 font-bold uppercase">Rendimiento Global</p>
+                <p className="text-2xl md:text-3xl font-bold text-brand-light mt-1">{global.rendimiento}%</p>
+                <p className="text-[11px] md:text-xs text-gray-500 mt-1">Fuera Top 20: <strong className="text-green-600">{fueraTop20.rendimiento}%</strong></p>
               </div>
-              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-red-600">
-                <p className="text-xs text-gray-500 font-bold uppercase">Rendimiento vs. Top 10</p>
-                <p className="text-3xl font-bold text-red-600 mt-1">{top10.rendimiento}%</p>
-                <p className="text-xs text-gray-500 mt-1">{top10.puntos} de {top10.posibles} pts ({top10.total} PJ)</p>
+              <div className="bg-white p-4 md:p-5 shadow rounded-lg border-l-4 border-red-600">
+                <p className="text-[11px] md:text-xs text-gray-500 font-bold uppercase">Rendimiento Top 10</p>
+                <p className="text-2xl md:text-3xl font-bold text-red-600 mt-1">{top10.rendimiento}%</p>
+                <p className="text-[11px] md:text-xs text-gray-500 mt-1">{top10.puntos} de {top10.posibles} pts ({top10.total} PJ)</p>
               </div>
             </div>
 
             {/* TABLA 1: RENDIMIENTO GENERAL Y POR RANKING FIFA */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="bg-brand-dark text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
-                <div className="font-bold text-base md:text-lg flex items-center space-x-2">
+              <div className="bg-brand-dark text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-4 md:px-5">
+                <div className="font-bold text-sm sm:text-base md:text-lg flex items-center space-x-2">
                   <Trophy size={20} />
                   <span>1. Rendimiento General y por Ranking FIFA</span>
                 </div>
-                <span className="text-xs text-blue-200">Haz clic en una categoría para desplegar sus rivales</span>
+                <span className="text-[11px] md:text-xs text-blue-200">Toca una categoría para desplegar sus rivales</span>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-center text-sm">
+                <table className="w-full text-center text-xs md:text-sm">
                   <thead className="bg-gray-100 text-gray-700 font-semibold">
                     <tr>
                       <th className="p-3 border text-left">Categoría Ranking FIFA</th>
@@ -1942,15 +2291,15 @@ export default function App() {
 
             {/* TABLA 2: RENDIMIENTO POR CONFEDERACIÓN */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="bg-brand-light text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
-                <div className="font-bold text-base md:text-lg flex items-center space-x-2">
+              <div className="bg-brand-light text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-4 md:px-5">
+                <div className="font-bold text-sm sm:text-base md:text-lg flex items-center space-x-2">
                   <Globe size={20} />
                   <span>2. Rendimiento por Confederación del Rival</span>
                 </div>
-                <span className="text-xs text-blue-100">Haz clic en una confederación para desplegar sus rivales</span>
+                <span className="text-[11px] md:text-xs text-blue-100">Toca una confederación para desplegar sus rivales</span>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-center text-sm">
+                <table className="w-full text-center text-xs md:text-sm">
                   <thead className="bg-gray-100 text-gray-700 font-semibold">
                     <tr>
                       <th className="p-3 border text-left">Confederación</th>
@@ -2057,12 +2406,12 @@ export default function App() {
 
             {/* TABLA 3: RENDIMIENTO POR RIVAL */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="bg-brand-dark text-white p-3.5 font-bold text-base md:text-lg flex items-center justify-center space-x-2">
+              <div className="bg-brand-dark text-white p-3.5 font-bold text-sm sm:text-base md:text-lg flex items-center justify-center space-x-2">
                 <Users size={20} />
                 <span>3. Rendimiento por Rival (Ordenado de Mayor a Menor Cantidad de Partidos)</span>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-center text-sm">
+                <table className="w-full text-center text-xs md:text-sm">
                   <thead className="bg-gray-100 text-gray-700 font-semibold">
                     <tr>
                       <th className="p-3 border text-left">Rival</th>
@@ -2107,41 +2456,41 @@ export default function App() {
         {/* TAB 2: ESTADÍSTICAS (10 VARIABLES TÉCNICAS Y DISCIPLINA)   */}
         {/* ========================================================== */}
         {activeTab === 'estadisticas' && (
-          <div className="space-y-8">
+          <div className="space-y-6 md:space-y-8">
             {/* TARJETAS KPI ESTADÍSTICAS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-brand-dark">
-                <p className="text-xs text-gray-500 font-bold uppercase">Remates / Al Arco</p>
-                <p className="text-3xl font-bold text-gray-800 mt-1">
-                  {globalStats.remates.sum ?? 0} <span className="text-lg font-semibold text-brand-light">/ {globalStats.rematesArco.sum ?? 0}</span>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className="bg-white p-4 md:p-5 shadow rounded-lg border-l-4 border-brand-dark">
+                <p className="text-[11px] md:text-xs text-gray-500 font-bold uppercase">Remates / Al Arco</p>
+                <p className="text-2xl md:text-3xl font-bold text-gray-800 mt-1">
+                  {globalStats.remates.sum ?? 0} <span className="text-base md:text-lg font-semibold text-brand-light">/ {globalStats.rematesArco.sum ?? 0}</span>
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Prom: {globalStats.remates.avg ? globalStats.remates.avg.toFixed(1) : '—'} remates · {globalStats.rematesArco.avg ? globalStats.rematesArco.avg.toFixed(1) : '—'} al arco ({globalStats.remates.count} PJ)
+                <p className="text-[11px] md:text-xs text-gray-500 mt-1">
+                  Prom: {globalStats.remates.avg ? globalStats.remates.avg.toFixed(1) : '—'} rem · {globalStats.rematesArco.avg ? globalStats.rematesArco.avg.toFixed(1) : '—'} arco
                 </p>
               </div>
-              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-brand-light">
-                <p className="text-xs text-gray-500 font-bold uppercase">Posesión Promedio</p>
-                <p className="text-3xl font-bold text-brand-light mt-1">
+              <div className="bg-white p-4 md:p-5 shadow rounded-lg border-l-4 border-brand-light">
+                <p className="text-[11px] md:text-xs text-gray-500 font-bold uppercase">Posesión Promedio</p>
+                <p className="text-2xl md:text-3xl font-bold text-brand-light mt-1">
                   {globalStats.posesion.avg ? `${globalStats.posesion.avg.toFixed(1)}%` : '—'}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Calculado sobre {globalStats.posesion.count} partidos con dato</p>
+                <p className="text-[11px] md:text-xs text-gray-500 mt-1">Sobre {globalStats.posesion.count} PJ con dato</p>
               </div>
-              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-green-600">
-                <p className="text-xs text-gray-500 font-bold uppercase">Pases y Precisión</p>
-                <p className="text-3xl font-bold text-green-600 mt-1">
+              <div className="bg-white p-4 md:p-5 shadow rounded-lg border-l-4 border-green-600">
+                <p className="text-[11px] md:text-xs text-gray-500 font-bold uppercase">Pases y Precisión</p>
+                <p className="text-2xl md:text-3xl font-bold text-green-600 mt-1">
                   {globalStats.precisionPases.avg ? `${globalStats.precisionPases.avg.toFixed(1)}%` : '—'}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {(globalStats.pases.sum ?? 0).toLocaleString('es-CO')} pases totales ({globalStats.pases.count} PJ)
+                <p className="text-[11px] md:text-xs text-gray-500 mt-1">
+                  {(globalStats.pases.sum ?? 0).toLocaleString('es-CO')} pases ({globalStats.pases.count} PJ)
                 </p>
               </div>
-              <div className="bg-white p-5 shadow rounded-lg border-l-4 border-amber-500">
-                <p className="text-xs text-gray-500 font-bold uppercase">Disciplina y Balón Parado</p>
-                <p className="text-2xl font-bold text-gray-800 mt-1">
+              <div className="bg-white p-4 md:p-5 shadow rounded-lg border-l-4 border-amber-500">
+                <p className="text-[11px] md:text-xs text-gray-500 font-bold uppercase">Disciplina y Balón Parado</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-800 mt-1">
                   {globalStats.amarillas.sum ?? 0} <span className="text-xs font-normal text-amber-600">TA</span> · {globalStats.rojas.sum ?? 0} <span className="text-xs font-normal text-red-600">TR</span>
                 </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  {globalStats.faltas.sum ?? 0} faltas · {globalStats.tirosEsquina.sum ?? 0} tiros esquina · {globalStats.fueraLugar.sum ?? 0} fuera lugar
+                <p className="text-[11px] md:text-xs text-gray-500 mt-1.5">
+                  {globalStats.faltas.sum ?? 0} faltas · {globalStats.tirosEsquina.sum ?? 0} córners · {globalStats.fueraLugar.sum ?? 0} offside
                 </p>
               </div>
             </div>
@@ -2171,12 +2520,12 @@ export default function App() {
 
             {/* TABLA 1: ESTADÍSTICAS GENERALES Y POR RANKING FIFA */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="bg-brand-dark text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
-                <div className="font-bold text-base md:text-lg flex items-center space-x-2">
+              <div className="bg-brand-dark text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-4 md:px-5">
+                <div className="font-bold text-sm sm:text-base md:text-lg flex items-center space-x-2">
                   <Trophy size={20} />
                   <span>1. Estadísticas Generales y por Ranking FIFA</span>
                 </div>
-                <span className="text-xs text-blue-200">Haz clic en una categoría para desplegar sus rivales</span>
+                <span className="text-[11px] md:text-xs text-blue-200">Toca una categoría para desplegar sus rivales</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-center text-xs md:text-sm whitespace-nowrap">
@@ -2274,12 +2623,12 @@ export default function App() {
 
             {/* TABLA 2: ESTADÍSTICAS POR CONFEDERACIÓN DEL RIVAL */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="bg-brand-light text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-5">
-                <div className="font-bold text-base md:text-lg flex items-center space-x-2">
+              <div className="bg-brand-light text-white p-3.5 flex flex-col sm:flex-row items-center justify-between gap-1 px-4 md:px-5">
+                <div className="font-bold text-sm sm:text-base md:text-lg flex items-center space-x-2">
                   <Globe size={20} />
                   <span>2. Estadísticas por Confederación del Rival</span>
                 </div>
-                <span className="text-xs text-blue-100">Haz clic en una confederación para desplegar sus rivales</span>
+                <span className="text-[11px] md:text-xs text-blue-100">Toca una confederación para desplegar sus rivales</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-center text-xs md:text-sm whitespace-nowrap">
@@ -2369,7 +2718,7 @@ export default function App() {
 
             {/* TABLA 3: ESTADÍSTICAS POR RIVAL */}
             <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="bg-brand-dark text-white p-3.5 font-bold text-base md:text-lg flex items-center justify-center space-x-2">
+              <div className="bg-brand-dark text-white p-3.5 font-bold text-sm sm:text-base md:text-lg flex items-center justify-center space-x-2">
                 <Users size={20} />
                 <span>3. Estadísticas por Rival (Ordenado de Mayor a Menor Cantidad de Partidos)</span>
               </div>
@@ -2418,13 +2767,13 @@ export default function App() {
         {/* TAB 3: ANÁLISIS (RESULTADOS + ESTADÍSTICAS DINÁMICAS)      */}
         {/* ========================================================== */}
         {activeTab === 'analisis' && (
-          <div className="bg-white shadow-lg rounded-lg p-6 md:p-8 border-t-8 border-brand-dark space-y-6">
+          <div className="bg-white shadow-lg rounded-lg p-5 md:p-8 border-t-8 border-brand-dark space-y-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b pb-4">
               <div>
-                <h2 className="text-2xl font-bold text-brand-dark">
+                <h2 className="text-xl md:text-2xl font-bold text-brand-dark">
                   Análisis Integral: Resultados y Estadísticas de Juego
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs md:text-sm text-gray-500 mt-1">
                   Diagnóstico automatizado en tiempo real sobre <strong>{global.total} partidos</strong> ({global.puntos} de {global.posibles} pts) y cobertura estadística de <strong>{globalStats.remates.count} partidos</strong> técnicos / <strong>{globalStats.pases.count} partidos</strong> de distribución.
                 </p>
               </div>
@@ -2437,45 +2786,44 @@ export default function App() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
                 <p className="text-[11px] font-bold uppercase text-gray-500">Balance de Resultados</p>
-                <p className="text-lg font-bold text-brand-dark mt-0.5">{global.ganados}G · {global.empatados}E · {global.perdidos}P</p>
-                <p className="text-xs text-gray-600 mt-0.5">
-                  Goles: <strong>{global.golesFavor}</strong> a favor / <strong>{global.golesContra}</strong> en contra ({global.diferenciaGoles >= 0 ? `+${global.diferenciaGoles}` : global.diferenciaGoles})
+                <p className="text-base md:text-lg font-bold text-brand-dark mt-0.5">{global.ganados}G · {global.empatados}E · {global.perdidos}P</p>
+                <p className="text-[11px] md:text-xs text-gray-600 mt-0.5">
+                  Goles: <strong>{global.golesFavor}</strong> GF / <strong>{global.golesContra}</strong> GC ({global.diferenciaGoles >= 0 ? `+${global.diferenciaGoles}` : global.diferenciaGoles})
                 </p>
               </div>
               <div className="bg-blue-50/70 p-3.5 rounded-lg border border-blue-200">
                 <p className="text-[11px] font-bold uppercase text-gray-500">Producción Ofensiva</p>
-                <p className="text-lg font-bold text-brand-light mt-0.5">
+                <p className="text-base md:text-lg font-bold text-brand-light mt-0.5">
                   {globalStats.remates.avg ? `${globalStats.remates.avg.toFixed(1)} rem/PJ` : '—'}
                 </p>
-                <p className="text-xs text-gray-600 mt-0.5">
-                  Al arco: <strong>{globalStats.rematesArco.avg ? globalStats.rematesArco.avg.toFixed(1) : '—'}/PJ</strong>
-                  {globalStats.efectividadRemate !== null ? ` (${globalStats.efectividadRemate.toFixed(1)}% puntería)` : ''}
+                <p className="text-[11px] md:text-xs text-gray-600 mt-0.5">
+                  Arco: <strong>{globalStats.rematesArco.avg ? globalStats.rematesArco.avg.toFixed(1) : '—'}/PJ</strong>
+                  {globalStats.efectividadRemate !== null ? ` (${globalStats.efectividadRemate.toFixed(1)}%)` : ''}
                 </p>
               </div>
               <div className="bg-green-50/70 p-3.5 rounded-lg border border-green-200">
                 <p className="text-[11px] font-bold uppercase text-gray-500">Control y Circulación</p>
-                <p className="text-lg font-bold text-green-700 mt-0.5">
+                <p className="text-base md:text-lg font-bold text-green-700 mt-0.5">
                   {globalStats.posesion.avg ? `${globalStats.posesion.avg.toFixed(1)}% pos.` : '—'}
                 </p>
-                <p className="text-xs text-gray-600 mt-0.5">
-                  Pases: <strong>{globalStats.pases.avg ? Math.round(globalStats.pases.avg) : '—'}/PJ</strong> · Precisión: <strong>{globalStats.precisionPases.avg ? `${globalStats.precisionPases.avg.toFixed(1)}%` : '—'}</strong>
+                <p className="text-[11px] md:text-xs text-gray-600 mt-0.5">
+                  Pases: <strong>{globalStats.pases.avg ? Math.round(globalStats.pases.avg) : '—'}/PJ</strong> · <strong>{globalStats.precisionPases.avg ? `${globalStats.precisionPases.avg.toFixed(1)}%` : '—'}</strong>
                 </p>
               </div>
               <div className="bg-amber-50/70 p-3.5 rounded-lg border border-amber-200">
                 <p className="text-[11px] font-bold uppercase text-gray-500">Disciplina y Balón Parado</p>
-                <p className="text-lg font-bold text-amber-800 mt-0.5">
+                <p className="text-base md:text-lg font-bold text-amber-800 mt-0.5">
                   {globalStats.amarillas.sum ?? 0} TA · {globalStats.rojas.sum ?? 0} TR
                 </p>
-                <p className="text-xs text-gray-600 mt-0.5">
+                <p className="text-[11px] md:text-xs text-gray-600 mt-0.5">
                   Faltas: <strong>{globalStats.faltas.avg ? globalStats.faltas.avg.toFixed(1) : '—'}/PJ</strong> · Córners: <strong>{globalStats.tirosEsquina.avg ? globalStats.tirosEsquina.avg.toFixed(1) : '—'}/PJ</strong>
                 </p>
               </div>
             </div>
 
-            <div className="space-y-5 text-gray-700 leading-relaxed">
-              {/* SECCIÓN 1: RESULTADOS + ESTADÍSTICAS GLOBALES */}
-              <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
-                <h3 className="font-bold text-brand-dark text-lg mb-2">
+            <div className="space-y-5 text-sm md:text-base text-gray-700 leading-relaxed">
+              <div className="bg-slate-50 p-4 md:p-5 rounded-lg border border-slate-200">
+                <h3 className="font-bold text-brand-dark text-base md:text-lg mb-2">
                   1. Balance Global de Resultados y Comportamiento Estadístico
                 </h3>
                 <p>
@@ -2487,9 +2835,8 @@ export default function App() {
                 </p>
               </div>
 
-              {/* SECCIÓN 2: CORRELACIÓN RENDIMIENTO + ESTADÍSTICAS POR RANKING FIFA */}
-              <div className="bg-blue-50 p-5 rounded-lg border border-blue-200 space-y-3">
-                <h3 className="font-bold text-brand-dark text-lg">
+              <div className="bg-blue-50 p-4 md:p-5 rounded-lg border border-blue-200 space-y-3">
+                <h3 className="font-bold text-brand-dark text-base md:text-lg">
                   2. Correlación Resultados vs. Estadísticas según Nivel del Rival (Ranking FIFA)
                 </h3>
                 <ul className="list-disc pl-5 space-y-2.5">
@@ -2506,9 +2853,8 @@ export default function App() {
                 </ul>
               </div>
 
-              {/* SECCIÓN 3: COMPARATIVA POR CONFEDERACIÓN (RESULTADOS + MÉTRICAS CLAVE) */}
-              <div className="bg-indigo-50/60 p-5 rounded-lg border border-indigo-200">
-                <h3 className="font-bold text-brand-light text-lg mb-3">
+              <div className="bg-indigo-50/60 p-4 md:p-5 rounded-lg border border-indigo-200">
+                <h3 className="font-bold text-brand-light text-base md:text-lg mb-3">
                   3. Comparativa Intercontinental por Confederaciones (Resultados y Estadísticas)
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -2548,9 +2894,8 @@ export default function App() {
                 </div>
               </div>
 
-              {/* SECCIÓN 4: CONCLUSIONES ESTRATÉGICAS DINÁMICAS */}
-              <div className="bg-red-50 p-5 rounded-lg border border-red-200 space-y-2">
-                <h3 className="font-bold text-red-800 text-lg">
+              <div className="bg-red-50 p-4 md:p-5 rounded-lg border border-red-200 space-y-2">
+                <h3 className="font-bold text-red-800 text-base md:text-lg">
                   4. Conclusiones Estratégicas para el Cuerpo Técnico
                 </h3>
                 <p className="text-gray-800">
@@ -2575,14 +2920,13 @@ export default function App() {
         {/* ========================================================== */}
         {activeTab === 'cuerpo_tecnico' && (
           <div className="space-y-6">
-            {/* ENCABEZADO DE SECCIÓN */}
-            <div className="bg-white p-6 rounded-lg shadow border-t-4 border-brand-dark flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="bg-white p-5 md:p-6 rounded-lg shadow border-t-4 border-brand-dark flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-brand-dark flex items-center space-x-2">
+                <h2 className="text-xl md:text-2xl font-bold text-brand-dark flex items-center space-x-2">
                   <Award size={24} className="text-brand-light" />
                   <span>Cuerpo Técnico — Selección Colombia Femenina Mayores</span>
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs md:text-sm text-gray-500 mt-1">
                   Estructura técnica, roles metodológicos y reseña profesional de cada integrante.
                 </p>
               </div>
@@ -2610,7 +2954,6 @@ export default function App() {
               )}
             </div>
 
-            {/* MODAL / CAJA DE PIN PARA EDITAR CUERPO TÉCNICO SI NO ESTÁ AUTENTICADO */}
             {showStaffPinModal && !isAdmin && (
               <div className="bg-white p-6 rounded-lg shadow-md border-t-4 border-red-600 max-w-md mx-auto text-center">
                 <ShieldAlert className="mx-auto text-red-600 mb-3" size={40} />
@@ -2621,6 +2964,7 @@ export default function App() {
                 <form onSubmit={verificarPin} className="space-y-3">
                   <input
                     type="password"
+                    inputMode="numeric"
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
                     placeholder="PIN (ej. 2026)"
@@ -2646,9 +2990,8 @@ export default function App() {
               </div>
             )}
 
-            {/* VISTA DE LECTURA O FORMULARIO DE EDICIÓN DE LOS 4 INTEGRANTES */}
             {!editingStaff ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
                 {cuerpoTecnico.map((miembro, idx) => {
                   const initials = miembro.nombre
                     .split(' ')
@@ -2663,7 +3006,7 @@ export default function App() {
                         idx === 0 ? 'border-brand-dark' : 'border-brand-light'
                       }`}
                     >
-                      <div className="p-6">
+                      <div className="p-5 md:p-6">
                         <div className="flex items-center space-x-4 mb-4">
                           <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-lg shrink-0 shadow ${
                             idx === 0 ? 'bg-brand-dark' : 'bg-brand-light'
@@ -2674,7 +3017,7 @@ export default function App() {
                             <span className="inline-block text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-50 text-brand-dark border border-blue-200">
                               {miembro.cargo}
                             </span>
-                            <h3 className="text-xl font-bold text-gray-900 mt-1">{miembro.nombre}</h3>
+                            <h3 className="text-lg md:text-xl font-bold text-gray-900 mt-1">{miembro.nombre}</h3>
                             {miembro.especialidad && (
                               <p className="text-xs text-brand-light font-medium mt-0.5">{miembro.especialidad}</p>
                             )}
@@ -2754,7 +3097,7 @@ export default function App() {
         )}
 
         {/* ========================================================== */}
-        {/* TAB 5: FORMULARIO PROTEGIDO                                */}
+        {/* TAB 5: REGISTRAR Y EDITAR DATOS (CAPTURA MÓVIL + EXCEL)    */}
         {/* ========================================================== */}
         {activeTab === 'formulario' && (
           <div className="max-w-3xl mx-auto space-y-6">
@@ -2762,10 +3105,11 @@ export default function App() {
               <div className="bg-white p-8 rounded-lg shadow-md text-center border-t-4 border-red-600 max-w-md mx-auto">
                 <ShieldAlert className="mx-auto text-red-600 mb-4" size={48} />
                 <h2 className="text-xl font-bold mb-2">Acceso Restringido</h2>
-                <p className="text-gray-600 mb-6 text-sm">Ingrese el PIN de administrador para registrar partidos o sincronizar la base de datos.</p>
+                <p className="text-gray-600 mb-6 text-sm">Ingrese el PIN de administrador para registrar o editar partidos y estadísticas.</p>
                 <form onSubmit={verificarPin}>
                   <input
                     type="password"
+                    inputMode="numeric"
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
                     placeholder="PIN (ej. 2026)"
@@ -2779,35 +3123,85 @@ export default function App() {
               </div>
             ) : (
               <>
-                {/* PANEL DE SINCRONIZACIÓN DE LOS 53 PARTIDOS HISTÓRICOS */}
-                <div className="bg-blue-50 p-5 rounded-lg border border-blue-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div>
-                    <h3 className="font-bold text-brand-dark flex items-center space-x-2">
-                      <CheckCircle2 size={18} className="text-green-600" />
-                      <span>Base Histórica (53 Partidos + Estadísticas)</span>
-                    </h3>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Sincroniza los 53 partidos históricos junto con sus estadísticas actualizadas de remates, posesión, pases y disciplina en Firebase Firestore:
-                    </p>
+                {/* ACCIONES RÁPIDAS MÓVILES: SINCRONIZAR FIREBASE Y EXPORTAR EXCEL */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 flex flex-col justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold text-sm text-brand-dark flex items-center space-x-2">
+                        <CheckCircle2 size={17} className="text-green-600 shrink-0" />
+                        <span>Respaldo en Firebase ({partidos.length} PJ)</span>
+                      </h3>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Sube o actualiza los 53 partidos históricos con sus estadísticas en Firestore.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={syncing}
+                      onClick={sincronizarHistoricos}
+                      className="w-full bg-brand-dark text-white text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-brand-light transition flex items-center justify-center space-x-2 disabled:opacity-50"
+                    >
+                      <UploadCloud size={16} />
+                      <span>{syncing ? 'Subiendo...' : 'Sincronizar 53 en Firebase'}</span>
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    disabled={syncing}
-                    onClick={sincronizarHistoricos}
-                    className="whitespace-nowrap bg-brand-dark text-white text-xs font-bold px-4 py-2.5 rounded hover:bg-brand-light transition flex items-center space-x-2 disabled:opacity-50"
-                  >
-                    <UploadCloud size={16} />
-                    <span>{syncing ? 'Subiendo...' : 'Actualizar 53 en Firebase'}</span>
-                  </button>
+
+                  <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200 flex flex-col justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold text-sm text-emerald-900 flex items-center space-x-2">
+                        <FileSpreadsheet size={17} className="text-emerald-600 shrink-0" />
+                        <span>Exportar Informe Excel (.xlsx)</span>
+                      </h3>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Descarga en tu celular o PC el libro completo con Partidos, Rendimiento, Estadísticas y Análisis.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={exportingExcel}
+                      onClick={exportarExcelCompleto}
+                      className="w-full bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-emerald-800 transition flex items-center justify-center space-x-2 disabled:opacity-50"
+                    >
+                      <Download size={16} />
+                      <span>{exportingExcel ? 'Generando Excel...' : 'Descargar Excel (.xlsx)'}</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* FORMULARIO DE NUEVO PARTIDO */}
-                <form onSubmit={handleSubmit} className="bg-white p-6 shadow-md rounded-lg space-y-5 border-t-4 border-brand-dark">
-                  <div className="flex justify-between items-center border-b pb-3">
-                    <h2 className="text-xl font-bold text-brand-dark">Registrar Nuevo Partido (#{partidos.length + 1})</h2>
-                    <button type="button" onClick={() => setIsAdmin(false)} className="text-sm text-gray-500 hover:text-red-600">
-                      Cerrar Sesión
-                    </button>
+                {/* FORMULARIO DE NUEVO PARTIDO O EDICIÓN DE PARTIDO EXISTENTE */}
+                <form
+                  onSubmit={handleSubmit}
+                  className={`bg-white p-5 md:p-6 shadow-md rounded-lg space-y-5 border-t-4 ${
+                    editingMatch ? 'border-amber-500 ring-2 ring-amber-200' : 'border-brand-dark'
+                  }`}
+                >
+                  <div className="flex flex-wrap justify-between items-center gap-2 border-b pb-3">
+                    <div>
+                      <h2 className="text-lg md:text-xl font-bold text-brand-dark">
+                        {editingMatch
+                          ? `Editando Partido: Colombia vs. ${editingMatch.rival} (${editingMatch.fecha})`
+                          : `Registrar Nuevo Partido (#${partidos.length + 1})`}
+                      </h2>
+                      {editingMatch && (
+                        <p className="text-xs text-amber-700 mt-0.5">
+                          Modifica el marcador, ranking FIFA o estadísticas y pulsa Guardar Cambios.
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {editingMatch && (
+                        <button
+                          type="button"
+                          onClick={cancelarEdicionPartido}
+                          className="text-xs bg-gray-200 text-gray-700 font-bold px-3 py-1.5 rounded hover:bg-gray-300"
+                        >
+                          Cancelar Edición
+                        </button>
+                      )}
+                      <button type="button" onClick={() => setIsAdmin(false)} className="text-xs text-gray-500 hover:text-red-600">
+                        Cerrar Sesión
+                      </button>
+                    </div>
                   </div>
 
                   {/* DATOS BÁSICOS Y MARCADOR */}
@@ -2822,7 +3216,7 @@ export default function App() {
                           placeholder="Ej. Alemania, Argentina, Estados Unidos..."
                           value={formData.rival}
                           onChange={e => setFormData({ ...formData, rival: e.target.value })}
-                          className="w-full p-2.5 border rounded mt-1"
+                          className="w-full p-2.5 border rounded-lg mt-1"
                         />
                       </div>
                       <div>
@@ -2830,11 +3224,12 @@ export default function App() {
                         <input
                           required
                           type="number"
+                          inputMode="numeric"
                           min="1"
                           placeholder="Ej. 12"
                           value={formData.ranking}
                           onChange={e => setFormData({ ...formData, ranking: e.target.value })}
-                          className="w-full p-2.5 border rounded mt-1"
+                          className="w-full p-2.5 border rounded-lg mt-1"
                         />
                       </div>
                       <div>
@@ -2843,7 +3238,7 @@ export default function App() {
                           required
                           value={formData.confederacion}
                           onChange={e => setFormData({ ...formData, confederacion: e.target.value })}
-                          className="w-full p-2.5 border rounded mt-1"
+                          className="w-full p-2.5 border rounded-lg mt-1 bg-white"
                         >
                           <option value="Conmebol">Conmebol</option>
                           <option value="Concacaf">Concacaf</option>
@@ -2858,10 +3253,11 @@ export default function App() {
                         <input
                           required
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           value={formData.golesCol}
                           onChange={e => setFormData({ ...formData, golesCol: e.target.value })}
-                          className="w-full p-2.5 border rounded mt-1"
+                          className="w-full p-2.5 border rounded-lg mt-1"
                         />
                       </div>
                       <div>
@@ -2869,10 +3265,11 @@ export default function App() {
                         <input
                           required
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           value={formData.golesRiv}
                           onChange={e => setFormData({ ...formData, golesRiv: e.target.value })}
-                          className="w-full p-2.5 border rounded mt-1"
+                          className="w-full p-2.5 border rounded-lg mt-1"
                         />
                       </div>
                       <div>
@@ -2882,7 +3279,7 @@ export default function App() {
                           type="date"
                           value={formData.fecha}
                           onChange={e => setFormData({ ...formData, fecha: e.target.value })}
-                          className="w-full p-2.5 border rounded mt-1"
+                          className="w-full p-2.5 border rounded-lg mt-1"
                         />
                       </div>
                       <div>
@@ -2892,7 +3289,7 @@ export default function App() {
                           placeholder="Ej. Fecha Fifa, Copa América..."
                           value={formData.tipo}
                           onChange={e => setFormData({ ...formData, tipo: e.target.value })}
-                          className="w-full p-2.5 border rounded mt-1"
+                          className="w-full p-2.5 border rounded-lg mt-1"
                         />
                       </div>
                     </div>
@@ -2908,143 +3305,228 @@ export default function App() {
                         <label className="block text-xs font-bold text-gray-700">Remates</label>
                         <input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           placeholder="Ej. 14"
                           value={formData.remates}
                           onChange={e => setFormData({ ...formData, remates: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700">Rem. al Arco</label>
                         <input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           placeholder="Ej. 6"
                           value={formData.rematesArco}
                           onChange={e => setFormData({ ...formData, rematesArco: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700">Posesión (%)</label>
                         <input
                           type="number"
+                          inputMode="decimal"
                           step="0.1"
                           min="0"
                           max="100"
                           placeholder="Ej. 58.5"
                           value={formData.posesion}
                           onChange={e => setFormData({ ...formData, posesion: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700">Pases Totales</label>
                         <input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           placeholder="Ej. 420"
                           value={formData.pases}
                           onChange={e => setFormData({ ...formData, pases: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700">Prec. Pases (%)</label>
                         <input
                           type="number"
+                          inputMode="decimal"
                           step="0.1"
                           min="0"
                           max="100"
                           placeholder="Ej. 81.2"
                           value={formData.precisionPases}
                           onChange={e => setFormData({ ...formData, precisionPases: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700">Faltas</label>
                         <input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           placeholder="Ej. 12"
                           value={formData.faltas}
                           onChange={e => setFormData({ ...formData, faltas: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700">Amarillas</label>
                         <input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           placeholder="Ej. 2"
                           value={formData.amarillas}
                           onChange={e => setFormData({ ...formData, amarillas: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700">Rojas</label>
                         <input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           placeholder="Ej. 0"
                           value={formData.rojas}
                           onChange={e => setFormData({ ...formData, rojas: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700">T. Esquina</label>
                         <input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           placeholder="Ej. 5"
                           value={formData.tirosEsquina}
                           onChange={e => setFormData({ ...formData, tirosEsquina: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700">Fuera Lugar</label>
                         <input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           placeholder="Ej. 2"
                           value={formData.fueraLugar}
                           onChange={e => setFormData({ ...formData, fueraLugar: e.target.value })}
-                          className="w-full p-2 border rounded mt-1 text-sm"
+                          className="w-full p-2 border rounded-lg mt-1 text-sm"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <button type="submit" className="w-full bg-brand-light text-white font-bold py-3 mt-2 rounded hover:bg-brand-dark transition">
-                    Guardar Resultado y Estadísticas
+                  <button
+                    type="submit"
+                    className={`w-full text-white font-bold py-3 mt-2 rounded-lg transition ${
+                      editingMatch ? 'bg-amber-600 hover:bg-amber-700' : 'bg-brand-light hover:bg-brand-dark'
+                    }`}
+                  >
+                    {editingMatch ? 'Guardar Cambios del Partido' : 'Guardar Resultado y Estadísticas'}
                   </button>
                 </form>
 
-                {/* LISTA DE PARTIDOS NUEVOS AGREGADOS EN FIREBASE */}
-                {nuevosPartidosFirebase.length > 0 && (
-                  <div className="bg-white p-5 shadow rounded-lg">
-                    <h3 className="font-bold text-gray-800 mb-3">Partidos Nuevos Registrados en la Web ({nuevosPartidosFirebase.length})</h3>
-                    <div className="divide-y text-sm">
-                      {nuevosPartidosFirebase.map(p => (
-                        <div key={p.id} className="py-2.5 flex justify-between items-center">
-                          <div>
-                            <span className="font-bold text-gray-800">Colombia {p.golesCol} - {p.golesRiv} {p.rival}</span>
-                            <span className="text-xs text-gray-500 block">{p.fecha} · {p.confederacion} · Ranking #{p.ranking} ({p.resultado})</span>
-                          </div>
-                          <button onClick={() => eliminarPartido(p.id)} className="text-red-500 hover:text-red-700 p-1" title="Eliminar partido">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
+                {/* HISTORIAL COMPLETO PARA EDITAR O ELIMINAR CUALQUIER PARTIDO DESDE EL CELULAR */}
+                <div className="bg-white p-5 shadow rounded-lg space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b pb-3">
+                    <div>
+                      <h3 className="font-bold text-gray-800">
+                        Historial de Partidos ({partidosFiltradosAdmin.length} de {partidos.length})
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        Toca <strong>Editar</strong> en cualquier encuentro para completar o corregir sus estadísticas.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-lg self-start">
+                      <button
+                        type="button"
+                        onClick={() => setMatchFilter('todos')}
+                        className={`px-2.5 py-1 rounded text-xs font-bold ${matchFilter === 'todos' ? 'bg-brand-dark text-white' : 'text-gray-600'}`}
+                      >
+                        Todos ({partidos.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMatchFilter('nuevos')}
+                        className={`px-2.5 py-1 rounded text-xs font-bold ${matchFilter === 'nuevos' ? 'bg-brand-dark text-white' : 'text-gray-600'}`}
+                      >
+                        Nuevos ({partidos.filter(p => !p.esHistorico).length})
+                      </button>
                     </div>
                   </div>
-                )}
+
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-3 text-gray-400" />
+                    <input
+                      type="text"
+                      value={matchSearch}
+                      onChange={(e) => setMatchSearch(e.target.value)}
+                      placeholder="Buscar por rival, fecha o competencia..."
+                      className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+
+                  <div className="divide-y max-h-96 overflow-y-auto text-sm">
+                    {partidosFiltradosAdmin.map(p => (
+                      <div key={p.id} className="py-3 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-800 truncate">
+                              Colombia {p.golesCol} - {p.golesRiv} {p.rival}
+                            </span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              p.resultado === 'Ganado'
+                                ? 'bg-green-100 text-green-700'
+                                : p.resultado === 'Empatado'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {p.resultado}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500 block mt-0.5">
+                            {p.fecha} · {p.tipo} · {p.confederacion} (#{p.ranking})
+                            {p.pases ? ` · ${p.pases} pases` : ''}
+                            {p.posesion ? ` · ${p.posesion}% pos.` : ''}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => iniciarEdicionPartido(p)}
+                            className="bg-blue-50 text-brand-dark hover:bg-blue-100 px-2.5 py-1.5 rounded text-xs font-bold flex items-center gap-1"
+                            title="Editar partido"
+                          >
+                            <Edit3 size={14} />
+                            <span>Editar</span>
+                          </button>
+                          {!p.esHistorico && (
+                            <button
+                              type="button"
+                              onClick={() => eliminarPartido(p.id)}
+                              className="text-red-500 hover:bg-red-50 p-1.5 rounded"
+                              title="Eliminar partido"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </>
             )}
           </div>

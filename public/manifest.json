@@ -1,0 +1,30 @@
+{
+  "name": "Selección Colombia Femenina Mayores - CT Angelo Marsiglia",
+  "short_name": "Sele Colombia Fem",
+  "description": "Aplicación móvil de rendimiento, estadísticas de juego, análisis y registro de partidos de la Selección Colombia Femenina Mayores.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F9FAFB",
+  "theme_color": "#1F497D",
+  "lang": "es-CO",
+  "categories": [
+    "sports",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
